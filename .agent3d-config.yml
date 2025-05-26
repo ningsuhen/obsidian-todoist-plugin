@@ -1,0 +1,120 @@
+# Agent3D Configuration for Obsidian Todoist Plugin (ADHD-Optimized)
+# Documentation-Driven Development Configuration
+
+project:
+  name: "Obsidian Todoist Plugin (ADHD-Optimized)"
+  type: "obsidian_plugin"
+  language: "typescript"
+  framework: "react"
+  quality_level: "production"
+  description: "ADHD-friendly bidirectional sync between Obsidian and Todoist with knowledge context integration and painless zero-configuration setup"
+  
+  # ADHD-specific project considerations
+  adhd_optimizations:
+    cognitive_load_minimization: true
+    dopamine_friendly_design: true
+    hyperfocus_support: true
+    workflow_preservation: true
+    time_blindness_accommodation: true
+    painless_setup: true
+    zero_configuration: true
+
+# Enable all relevant passes for plugin development
+enabled_passes:
+  - requirements_pass
+  - foundation_pass
+  - documentation_pass
+  - implementation_pass
+  - testing_pass
+  - refactoring_pass
+  - code_review_pass
+  - synchronization_pass
+  - quality_pass
+  - prune_pass
+  - reverse_pass
+
+# Pass-specific configurations
+pass_config:
+  requirements_pass:
+    focus_areas:
+      - painless_setup_zero_config
+      - bidirectional_sync
+      - adhd_workflow_optimization
+      - knowledge_context_integration
+      - p0_priority_preservation
+      - task_chaining_support
+      - dopamine_friendly_ui
+      - hyperfocus_protection
+      - convention_over_configuration
+    stakeholders:
+      - primary_user_with_adhd
+      - obsidian_community
+      - todoist_users
+      - adhd_community
+    special_requirements:
+      - preserve_existing_todoist_workflow
+      - minimize_cognitive_overhead
+      - support_hyperfocus_sessions
+      - provide_dopamine_rewards
+      - integrate_with_knowledge_base
+      - zero_configuration_setup
+      - convention_based_organization
+  
+  foundation_pass:
+    architecture_patterns:
+      - bidirectional_sync_engine
+      - knowledge_context_system
+      - adhd_optimized_ui
+      - event_driven_updates
+      - zero_config_setup_system
+      - convention_based_file_management
+
+# Plugin-specific settings
+plugin_config:
+  manifest:
+    id: "obsidian-todoist-sync-adhd"
+    name: "Todoist Sync (ADHD-Optimized)"
+    min_app_version: "0.15.0"
+    mobile_support: true
+    
+  features:
+    bidirectional_sync: true
+    knowledge_integration: true
+    adhd_optimizations: true
+    real_time_updates: true
+    offline_support: true
+    zero_config_setup: true
+    convention_based_sync: true
+
+# Convention-based sync configuration
+sync_conventions:
+  default_folder: "Todoist"
+  project_mapping: "automatic"
+  file_naming: "human_readable"
+  conflict_resolution: "automatic"
+  setup_steps: 1  # API token only
+
+# Success metrics
+success_metrics:
+  setup_time_max: 120  # seconds
+  configuration_steps: 1  # API token only
+  required_decisions: 0
+  cognitive_load_reduction: 40  # percent
+  user_satisfaction_min: 95  # percent
+
+# Development phases
+development_phases:
+  phase_1_critical:
+    name: "Painless Setup + Core Sync"
+    duration_weeks: 2
+    priority: "CRITICAL"
+    
+  phase_2_adhd_core:
+    name: "ADHD Core Features"
+    duration_weeks: 2
+    priority: "HIGH"
+    
+  phase_3_knowledge:
+    name: "Knowledge Integration"
+    duration_weeks: 2
+    priority: "HIGH"
