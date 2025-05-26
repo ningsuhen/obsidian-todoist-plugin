@@ -44,7 +44,13 @@ This principle eliminates cognitive overhead for ADHD users by removing decision
 - **REQ-F001-19:** Preserve Obsidian links when task content changes
 - **REQ-F001-20:** Support manual file organization without breaking sync
 
-### F2. Painless Setup and Configuration (12 requirements)
+#### F1.6 Obsidian Tasks Plugin Interoperability (ADHD-Critical)
+- **REQ-F001-21:** Generate standard markdown checkbox format (`- [ ]` / `- [x]`)
+- **REQ-F001-22:** Use Obsidian Tasks emoji conventions (`📅`, `⏫`, `🔼`, `🔽`)
+- **REQ-F001-23:** Support hashtag labels compatible with Tasks plugin
+- **REQ-F001-24:** Maintain dual-format support for enhanced metadata
+
+### F2. Painless Setup and Configuration (16 requirements)
 
 #### F2.1 Zero-Configuration Setup (ADHD-Critical)
 - **REQ-F002-01:** Work immediately after API token entry with ZERO additional configuration
@@ -63,6 +69,12 @@ This principle eliminates cognitive overhead for ADHD users by removing decision
 - **REQ-F002-10:** Use cognitive-load-reducing defaults for UI elements
 - **REQ-F002-11:** Activate automatic dopamine-friendly feedback systems
 - **REQ-F002-12:** Set hyperfocus-friendly notification settings by default
+
+#### F2.4 Migration and Compatibility Support
+- **REQ-F002-13:** Import existing Obsidian Tasks plugin tasks seamlessly
+- **REQ-F002-14:** Convert existing task formats to enhanced format automatically
+- **REQ-F002-15:** Provide migration wizard for existing Todoist plugin users
+- **REQ-F002-16:** Maintain backward compatibility with existing workflows
 
 ### F3. ADHD Workflow Preservation (12 requirements)
 
@@ -220,12 +232,12 @@ This principle eliminates cognitive overhead for ADHD users by removing decision
 ## Requirements Traceability
 
 ### Business Objective Mapping
-- **BO1 (ADHD-Optimized Productivity):** F1.1, F2.1, F3.1, F5.1, F5.2, NF7
-- **BO2 (Painless Setup):** F2.1, F2.2, F2.3, NF3
-- **BO3 (Knowledge Integration):** F4.1, F4.2, F4.3, F4.4
-- **BO4 (Workflow Preservation):** F3.1, F3.2, F3.3
-- **BO5 (Community Impact):** F6.2, F7.1, F7.2
-- **BO6 (Technical Excellence):** NF1, NF2, NF5, NF6
+- **BO1 (ADHD-Optimized Productivity Revolution):** F1.1, F2.1, F3.1, F5.1, F5.2, NF7
+- **BO2 (Painless Zero-Configuration Setup):** F2.1, F2.2, F2.3, NF3
+- **BO3 (Knowledge Context Integration Pioneer):** F4.1, F4.2, F4.3, F4.4
+- **BO4 (ADHD Workflow Preservation):** F3.1, F3.2, F3.3
+- **BO5 (Community Impact and Accessibility Leadership):** F6.2, F7.1, F7.2
+- **BO6 (Technical Excellence and Reliability):** NF1, NF2, NF5, NF6
 
 ### Priority Classification
 - **P0 (Critical):** F1.1, F2.1, F3.1, NF7 - Must have for MVP
@@ -267,7 +279,7 @@ This principle eliminates cognitive overhead for ADHD users by removing decision
 
 ---
 
-**Total Requirements:** 96 functional + 28 non-functional = 124 total
+**Total Requirements:** 104 functional + 28 non-functional = 132 total
 **Critical Path:** Painless setup → ADHD core features → Knowledge integration
 **Success Criteria:** <2 min setup, 0 config decisions, 40% cognitive load reduction
 **Document Status:** Requirements Pass Complete ✅
