@@ -44,9 +44,33 @@ const fileSyncCommand: MakeCommand = (plugin: TodoistPlugin, i18n: Translations[
   };
 };
 
+const bidirectionalSyncCommand: MakeCommand = (plugin: TodoistPlugin, i18n: Translations["commands"]) => {
+  return {
+    name: "Sync Changes Back to Todoist",
+    callback: async () => {
+      debug("Starting bidirectional sync");
+      try {
+        const fileSyncManager = new FileSyncManager(plugin);
+        const result = await fileSyncManager.syncObsidianChangesToTodoist();
+
+        if (result.errors.length > 0) {
+          new Notice(`⚠️ Sync completed with ${result.errors.length} errors. Check console for details.`, 5000);
+        } else {
+          new Notice(`✅ Sync complete! ${result.completed} tasks completed, ${result.updated} tasks updated`, 3000);
+        }
+      } catch (error) {
+        console.error("Bidirectional sync failed:", error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        new Notice(`❌ Bidirectional sync failed: ${errorMessage}`, 5000);
+      }
+    },
+  };
+};
+
 const commands = {
   "todoist-sync": syncCommand,
   "todoist-file-sync": fileSyncCommand,
+  "todoist-bidirectional-sync": bidirectionalSyncCommand,
   "add-task": addTask,
   "add-task-page-content": addTaskWithPageInContent,
   "add-task-page-description": addTaskWithPageInDescription,

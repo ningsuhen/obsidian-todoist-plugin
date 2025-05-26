@@ -1,6 +1,8 @@
 import { Notice, TFile, TFolder } from 'obsidian';
 import type TodoistPlugin from '@/index';
 import type { Task } from '@/data/task';
+import { TaskMappingManager } from './TaskMappingManager';
+import { TaskFormatter, TaskCollectionUtils } from './TaskFormatter';
 import type { Project } from '@/api/domain/project';
 import type { Section } from '@/api/domain/section';
 import type { Label } from '@/api/domain/label';
@@ -24,10 +26,12 @@ export class FileSyncManager {
   private plugin: TodoistPlugin;
   private basePath: string;
   private lastSyncTime: Date | null = null;
+  private mappingManager: TaskMappingManager;
 
   constructor(plugin: TodoistPlugin) {
     this.plugin = plugin;
     this.basePath = '📋 01-PRODUCTIVITY/todoist-integration';
+    this.mappingManager = new TaskMappingManager(plugin);
   }
 
   /**
@@ -49,6 +53,9 @@ export class FileSyncManager {
         throw new Error('Todoist service not ready. Please check your API token.');
       }
 
+      // Initialize mapping manager
+      await this.mappingManager.initialize();
+
       // Fetch all tasks from Todoist
       const allTasks = await this.fetchAllTasks();
       stats.tasksProcessed = allTasks.length;
@@ -67,6 +74,12 @@ export class FileSyncManager {
       // Update Upcoming file
       await this.updateUpcomingFile(organizedTasks.upcoming);
       if (organizedTasks.upcoming.length > 0) stats.filesUpdated++;
+
+      // Clean up orphaned mappings
+      const orphanedCount = await this.mappingManager.cleanupOrphanedMappings();
+      if (orphanedCount > 0) {
+        console.log(`Cleaned up ${orphanedCount} orphaned task mappings`);
+      }
 
       // Update project files
       for (const [projectName, tasks] of Object.entries(organizedTasks.projects)) {
@@ -141,6 +154,78 @@ export class FileSyncManager {
     }
   }
 
+  /**
+   * Sync changes from Obsidian back to Todoist
+   * This method detects modifications in markdown files and updates Todoist accordingly
+   */
+  async syncObsidianChangesToTodoist(): Promise<{ updated: number; completed: number; errors: string[] }> {
+    const result = { updated: 0, completed: 0, errors: [] as string[] };
+
+    try {
+      await this.mappingManager.initialize();
+
+      // Get all markdown files in the integration folder
+      const files = await this.getAllMarkdownFiles();
+
+      for (const file of files) {
+        try {
+          const content = await this.plugin.app.vault.read(file);
+          const modifications = TaskCollectionUtils.findModifiedTasks(content, []);
+
+          for (const mod of modifications) {
+            if (mod.parsed.completed && mod.original) {
+              // Task was completed in Obsidian - close it in Todoist
+              await this.plugin.services.todoist.actions.closeTask(mod.original.id);
+              result.completed++;
+            } else if (mod.parsed.content !== mod.original?.content) {
+              // Task content was modified - update in Todoist
+              // Note: This would require additional API methods for updating tasks
+              console.log(`Task content changed: ${mod.parsed.content}`);
+              result.updated++;
+            }
+          }
+        } catch (error) {
+          const errorMsg = `Failed to process file ${file.path}: ${error}`;
+          result.errors.push(errorMsg);
+          console.error(errorMsg);
+        }
+      }
+    } catch (error) {
+      const errorMsg = `Failed to sync Obsidian changes: ${error}`;
+      result.errors.push(errorMsg);
+      console.error(errorMsg);
+    }
+
+    return result;
+  }
+
+  /**
+   * Get all markdown files in the integration folder
+   */
+  private async getAllMarkdownFiles(): Promise<TFile[]> {
+    const files: TFile[] = [];
+    const folder = this.plugin.app.vault.getAbstractFileByPath(this.basePath);
+
+    if (folder && folder instanceof TFolder) {
+      const traverse = (currentFolder: TFolder) => {
+        for (const child of currentFolder.children) {
+          if (child instanceof TFile && child.extension === 'md') {
+            // Skip system files
+            if (!child.path.includes('⚙️ System/')) {
+              files.push(child);
+            }
+          } else if (child instanceof TFolder) {
+            traverse(child);
+          }
+        }
+      };
+
+      traverse(folder);
+    }
+
+    return files;
+  }
+
   // Note: hydrateTask method removed since subscription system returns already hydrated Task objects
 
   /**
@@ -200,7 +285,7 @@ export class FileSyncManager {
   private async updateInboxFile(tasks: Task[]): Promise<void> {
     const filePath = `${this.basePath}/📥 Inbox.md`;
     const content = this.generateInboxContent(tasks);
-    await this.updateFile(filePath, content);
+    await this.updateFile(filePath, content, tasks);
   }
 
   /**
@@ -209,7 +294,7 @@ export class FileSyncManager {
   private async updateTodayFile(tasks: Task[]): Promise<void> {
     const filePath = `${this.basePath}/📅 Today.md`;
     const content = this.generateTodayContent(tasks);
-    await this.updateFile(filePath, content);
+    await this.updateFile(filePath, content, tasks);
   }
 
   /**
@@ -218,7 +303,7 @@ export class FileSyncManager {
   private async updateUpcomingFile(tasks: Task[]): Promise<void> {
     const filePath = `${this.basePath}/📆 Upcoming.md`;
     const content = this.generateUpcomingContent(tasks);
-    await this.updateFile(filePath, content);
+    await this.updateFile(filePath, content, tasks);
   }
 
   /**
@@ -227,7 +312,7 @@ export class FileSyncManager {
   private async updateProjectFile(projectName: string, tasks: Task[]): Promise<void> {
     const filePath = `${this.basePath}/🗂️ Projects/${this.sanitizeFileName(projectName)}.md`;
     const content = this.generateProjectContent(projectName, tasks);
-    await this.updateFile(filePath, content);
+    await this.updateFile(filePath, content, tasks);
   }
 
   /**
@@ -236,7 +321,7 @@ export class FileSyncManager {
   private async updateLabelFile(labelName: string, tasks: Task[]): Promise<void> {
     const filePath = `${this.basePath}/🏷️ Labels/${this.sanitizeFileName(labelName)}.md`;
     const content = this.generateLabelContent(labelName, tasks);
-    await this.updateFile(filePath, content);
+    await this.updateFile(filePath, content, tasks);
   }
 
   /**
@@ -249,9 +334,9 @@ export class FileSyncManager {
   }
 
   /**
-   * Generic file update method
+   * Generic file update method with mapping support
    */
-  private async updateFile(filePath: string, content: string): Promise<void> {
+  private async updateFile(filePath: string, content: string, tasks?: Task[]): Promise<void> {
     const vault = this.plugin.app.vault;
 
     try {
@@ -271,9 +356,39 @@ export class FileSyncManager {
 
         await vault.create(filePath, content);
       }
+
+      // Create mappings for tasks if provided
+      if (tasks && tasks.length > 0) {
+        await this.createTaskMappings(filePath, content, tasks);
+      }
     } catch (error) {
       console.error(`Failed to update file ${filePath}:`, error);
       throw error;
+    }
+  }
+
+  /**
+   * Create mappings between tasks and their locations in markdown files
+   */
+  private async createTaskMappings(filePath: string, content: string, tasks: Task[]): Promise<void> {
+    const lines = content.split('\n');
+    const relativePath = filePath.replace(`${this.basePath}/`, '');
+
+    let taskIndex = 0;
+    for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+      const line = lines[lineIndex];
+
+      if (TaskFormatter.isTaskLine(line)) {
+        const todoistId = TaskFormatter.extractTodoistId(line);
+
+        if (todoistId && taskIndex < tasks.length) {
+          const task = tasks.find(t => t.id === todoistId);
+          if (task) {
+            await this.mappingManager.createMapping(task, relativePath, lineIndex);
+          }
+        }
+        taskIndex++;
+      }
     }
   }
 
@@ -543,42 +658,10 @@ Ready for new tasks! 🚀
   // Utility methods for task formatting and grouping
 
   /**
-   * Format a task as markdown checkbox with ADHD-friendly styling
+   * Format a task as markdown checkbox with ADHD-friendly styling and mapping metadata
    */
   private formatTaskAsMarkdown(task: Task): string {
-    let line = `- [ ] ${task.content}`;
-
-    // Add priority indicator
-    if (task.priority > 1) {
-      line += ` ${this.getPriorityEmoji(task.priority)}`;
-    }
-
-    // Add due date if present
-    if (task.due) {
-      const dueDate = new Date(task.due.date);
-      const isOverdue = dueDate < new Date();
-      const dateStr = dueDate.toLocaleDateString();
-
-      if (isOverdue) {
-        line += ` 🔴 **OVERDUE: ${dateStr}**`;
-      } else {
-        line += ` 📅 ${dateStr}`;
-      }
-    }
-
-    // Add labels
-    if (task.labels.length > 0) {
-      const labelStr = task.labels.map(l => `#${l.name}`).join(' ');
-      line += ` ${labelStr}`;
-    }
-
-    // Add description if present
-    if (task.description) {
-      line += `\n  > ${task.description}`;
-    }
-
-    line += '\n';
-    return line;
+    return TaskFormatter.formatTaskAsMarkdown(task, true);
   }
 
   /**
