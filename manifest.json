@@ -1,11 +1,11 @@
 {
-  "id": "todoist-sync-plugin",
-  "name": "Todoist Sync",
-  "version": "2.0.1",
+  "id": "obsidian-todoist-plugin-adhd",
+  "name": "🧠 ADHD-Optimized Todoist Plugin",
+  "version": "3.0.0",
   "minAppVersion": "1.0.0",
-  "description": "Materialize Todoist tasks within Obsidian notes.",
-  "author": "Jamie Brynes",
-  "authorUrl": "https://github.com/jamiebrynes7/obsidian-todoist-plugin",
+  "description": "ADHD-optimized Todoist integration with zero-configuration setup, cognitive load reduction, and dopamine-friendly feedback systems.",
+  "author": "Ningsuhen Waikhom",
+  "authorUrl": "https://github.com/ningsuhen/obsidian-todoist-plugin",
   "isDesktopOnly": false,
-  "fundingUrl": "https://www.buymeacoffee.com/jamiebrynes"
+  "fundingUrl": "https://github.com/ningsuhen/obsidian-todoist-plugin"
 }

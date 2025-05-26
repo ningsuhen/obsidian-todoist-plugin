@@ -28,7 +28,7 @@ echo "✅ Vault verified: $VAULT_PATH"
 
 # Create plugins directory if it doesn't exist
 PLUGINS_DIR="$VAULT_PATH/.obsidian/plugins"
-PLUGIN_DIR="$PLUGINS_DIR/obsidian-todoist-plugin"
+PLUGIN_DIR="$PLUGINS_DIR/obsidian-todoist-plugin-adhd"
 
 echo "📁 Creating plugin directory..."
 mkdir -p "$PLUGIN_DIR"
@@ -58,7 +58,7 @@ echo ""
 echo "📋 Next steps:"
 echo "   1. Open Obsidian"
 echo "   2. Go to Settings → Community Plugins"
-echo "   3. Enable 'Obsidian Todoist Plugin'"
+echo "   3. Enable '🧠 ADHD-Optimized Todoist Plugin'"
 echo "   4. The ADHD-optimized setup will start automatically!"
 echo ""
 echo "🧠 ADHD Features you'll experience:"

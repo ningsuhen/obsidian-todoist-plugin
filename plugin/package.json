@@ -1,7 +1,7 @@
 {
-  "name": "obsidian-todoist-plugin",
-  "version": "2.0.1",
-  "description": "A Todoist plugin for Obsidian",
+  "name": "obsidian-todoist-plugin-adhd",
+  "version": "3.0.0",
+  "description": "ADHD-optimized Todoist integration with zero-configuration setup, cognitive load reduction, and dopamine-friendly feedback systems",
   "scripts": {
     "check": "tsc --noEmit",
     "dev": "npm run check && VITE_ENV=dev vite build",
@@ -10,8 +10,8 @@
     "lint:check": "biome check ./src --config-path=../",
     "lint:fix": "biome check --write ./src --config-path=../"
   },
-  "author": "Jamie Brynes",
-  "license": "ISC",
+  "author": "Ningsuhen Waikhom",
+  "license": "MIT",
   "dependencies": {
     "@internationalized/date": "^3.5.2",
     "camelize-ts": "^3.0.0",
