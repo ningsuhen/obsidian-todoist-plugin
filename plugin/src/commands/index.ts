@@ -19,13 +19,33 @@ const syncCommand: MakeCommand = (plugin: TodoistPlugin, i18n: Translations["com
     name: i18n.sync,
     callback: async () => {
       debug("Syncing with Todoist API");
-      plugin.services.todoist.sync();
+      await plugin.services.todoist.sync();
+    },
+  };
+};
+
+const fileSyncCommand: MakeCommand = (plugin: TodoistPlugin, i18n: Translations["commands"]) => {
+  return {
+    name: "Sync Tasks to Files",
+    callback: async () => {
+      debug("Starting file-based sync");
+      try {
+        // Import FileSyncManager dynamically to avoid circular dependencies
+        const { FileSyncManager } = await import('@/core/sync/FileSyncManager');
+        const fileSyncManager = new FileSyncManager(plugin);
+        await fileSyncManager.syncAllTasks();
+      } catch (error) {
+        console.error("File sync failed:", error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        plugin.app.workspace.trigger('notice', `❌ File sync failed: ${errorMessage}`);
+      }
     },
   };
 };
 
 const commands = {
   "todoist-sync": syncCommand,
+  "todoist-file-sync": fileSyncCommand,
   "add-task": addTask,
   "add-task-page-content": addTaskWithPageInContent,
   "add-task-page-description": addTaskWithPageInDescription,

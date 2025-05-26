@@ -1,6 +1,6 @@
 import { Notice, TFolder } from 'obsidian';
 import type TodoistPlugin from '@/index';
-import type { TodoistApiClient } from '@/api';
+import { TodoistApiClient } from '@/api';
 import { ObsidianFetcher } from '@/api/fetcher';
 
 export interface SetupProgress {
@@ -131,10 +131,15 @@ export class SetupOrchestrator {
         });
       }
 
-      // Step 6: Initialize Sync Engine (100% progress)
+      // Step 6: Initialize Sync Engine (90% progress)
       await this.executeStep(SetupStep.SYNC_INITIALIZATION, async () => {
         await this.initializeSyncEngine(apiToken);
       });
+
+      // Step 7: Initial File Sync (100% progress)
+      this.currentProgress.currentOperation = 'Creating your Todoist-like files...';
+      this.notifyProgress();
+      await this.performInitialFileSync();
 
       result.success = true;
       result.stepsCompleted = this.currentProgress.completedSteps.length;
@@ -251,17 +256,19 @@ export class SetupOrchestrator {
   private async createEnhancedFolderStructure(basePath: string): Promise<void> {
     const vault = this.plugin.app.vault;
 
-    // Create comprehensive folder structure for new setups
+    // Create Todoist-like folder structure
     const folderStructure = [
+      // Keep existing folders for backward compatibility
       'p0-priority-tasks',
       'project-contexts',
       'tasks-inbox',
       'all-tasks-local',
       'task-templates',
-      'active-tasks',
-      'completed-tasks',
-      'recurring-tasks',
-      'project-specific'
+
+      // New Todoist-like structure
+      '🗂️ Projects',
+      '🏷️ Labels',
+      '⚙️ System'
     ];
 
     for (const folderName of folderStructure) {
@@ -270,6 +277,85 @@ export class SetupOrchestrator {
         await vault.createFolder(folderPath);
       } catch (error) {
         // Folder might already exist, continue
+      }
+    }
+
+    // Create main Todoist-like files
+    await this.createTodoistFiles(basePath);
+  }
+
+  private async createTodoistFiles(basePath: string): Promise<void> {
+    const vault = this.plugin.app.vault;
+
+    const todoistFiles = [
+      {
+        path: `${basePath}/📥 Inbox.md`,
+        content: `# 📥 Inbox
+
+*Tasks without a specific project*
+
+<!-- This file is automatically updated by the ADHD-Optimized Todoist Plugin -->
+<!-- Last sync: ${new Date().toISOString()} -->
+
+## Tasks
+*No tasks in inbox*
+`
+      },
+      {
+        path: `${basePath}/📅 Today.md`,
+        content: `# 📅 Today
+
+*Tasks due today*
+
+<!-- This file is automatically updated by the ADHD-Optimized Todoist Plugin -->
+<!-- Last sync: ${new Date().toISOString()} -->
+
+## Tasks
+*No tasks due today*
+`
+      },
+      {
+        path: `${basePath}/📆 Upcoming.md`,
+        content: `# 📆 Upcoming
+
+*Tasks due in the next 7 days*
+
+<!-- This file is automatically updated by the ADHD-Optimized Todoist Plugin -->
+<!-- Last sync: ${new Date().toISOString()} -->
+
+## Tasks
+*No upcoming tasks*
+`
+      },
+      {
+        path: `${basePath}/⚙️ System/Sync Status.md`,
+        content: `# ⚙️ Sync Status
+
+*Plugin synchronization information*
+
+## Last Sync
+- **Time:** ${new Date().toLocaleString()}
+- **Status:** ✅ Setup Complete
+- **Tasks Synced:** 0
+- **Projects Synced:** 0
+
+## Configuration
+- **ADHD Mode:** Enabled
+- **Auto Sync:** Every 5 minutes
+- **Folder Structure:** Todoist-like
+`
+      }
+    ];
+
+    for (const file of todoistFiles) {
+      try {
+        // Only create if doesn't exist
+        const existingFile = vault.getAbstractFileByPath(file.path);
+        if (!existingFile) {
+          await vault.create(file.path, file.content);
+        }
+      } catch (error) {
+        console.warn(`Could not create file: ${file.path}`, error);
       }
     }
   }
@@ -338,6 +424,23 @@ export class SetupOrchestrator {
     // Initialize the Todoist API client
     const apiClient = new TodoistApiClient(token, new ObsidianFetcher());
     await this.plugin.services.todoist.initialize(apiClient);
+  }
+
+  private async performInitialFileSync(): Promise<void> {
+    try {
+      // Import FileSyncManager dynamically to avoid circular dependencies
+      const { FileSyncManager } = await import('@/core/sync/FileSyncManager');
+      const fileSyncManager = new FileSyncManager(this.plugin);
+
+      // Wait a moment for the Todoist service to be fully ready
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Perform initial sync to populate files
+      await fileSyncManager.syncAllTasks();
+    } catch (error) {
+      console.warn('Initial file sync failed, but setup can continue:', error);
+      // Don't throw here - file sync failure shouldn't break setup
+    }
   }
 
   private getStepDescription(step: SetupStep): string {
