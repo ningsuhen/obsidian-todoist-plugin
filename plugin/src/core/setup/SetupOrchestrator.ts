@@ -2,6 +2,7 @@ import { Notice, TFolder } from 'obsidian';
 import type TodoistPlugin from '@/index';
 import { TodoistApiClient } from '@/api';
 import { ObsidianFetcher } from '@/api/fetcher';
+import { FileSyncManager } from '@/core/sync/FileSyncManager';
 
 export interface SetupProgress {
   currentStep: SetupStep;
@@ -428,8 +429,7 @@ export class SetupOrchestrator {
 
   private async performInitialFileSync(): Promise<void> {
     try {
-      // Import FileSyncManager dynamically to avoid circular dependencies
-      const { FileSyncManager } = await import('@/core/sync/FileSyncManager');
+      // Use static import to ensure proper bundling
       const fileSyncManager = new FileSyncManager(this.plugin);
 
       // Wait a moment for the Todoist service to be fully ready

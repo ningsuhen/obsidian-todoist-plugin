@@ -8,6 +8,8 @@ import type { Translations } from "@/i18n/translation";
 import type TodoistPlugin from "@/index";
 import debug from "@/log";
 import type { Command as ObsidianCommand } from "obsidian";
+import { FileSyncManager } from "@/core/sync/FileSyncManager";
+import { Notice } from "obsidian";
 
 export type MakeCommand = (
   plugin: TodoistPlugin,
@@ -30,14 +32,13 @@ const fileSyncCommand: MakeCommand = (plugin: TodoistPlugin, i18n: Translations[
     callback: async () => {
       debug("Starting file-based sync");
       try {
-        // Import FileSyncManager dynamically to avoid circular dependencies
-        const { FileSyncManager } = await import('@/core/sync/FileSyncManager');
+        // Use static import to ensure proper bundling
         const fileSyncManager = new FileSyncManager(plugin);
         await fileSyncManager.syncAllTasks();
       } catch (error) {
         console.error("File sync failed:", error);
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        plugin.app.workspace.trigger('notice', `❌ File sync failed: ${errorMessage}`);
+        new Notice(`❌ File sync failed: ${errorMessage}`, 5000);
       }
     },
   };
