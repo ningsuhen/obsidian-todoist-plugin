@@ -54,14 +54,14 @@ interface MigrationSummary {
 
 /**
  * SetupOrchestrator - Manages the complete zero-configuration setup process
- * 
+ *
  * This class orchestrates the entire setup flow for ADHD users:
  * 1. Validates API token with minimal user interaction
  * 2. Creates folder structure automatically
  * 3. Applies ADHD-optimized defaults
  * 4. Migrates existing data if found
  * 5. Initializes sync engine
- * 
+ *
  * Target: 98% completion rate in <2 minutes with 0 configuration decisions
  */
 export class SetupOrchestrator {
@@ -69,7 +69,7 @@ export class SetupOrchestrator {
   private progressCallbacks: ((progress: SetupProgress) => void)[] = [];
   private completionCallbacks: ((result: SetupResult) => void)[] = [];
   private errorCallbacks: ((error: SetupError) => void)[] = [];
-  
+
   private currentProgress: SetupProgress = {
     currentStep: SetupStep.TOKEN_VALIDATION,
     completedSteps: [],
@@ -140,7 +140,7 @@ export class SetupOrchestrator {
       result.stepsCompleted = this.currentProgress.completedSteps.length;
       result.configurationApplied = {
         adhdOptimizations: true,
-        folderStructure: 'Todoist/',
+        folderStructure: '📋 01-PRODUCTIVITY/todoist-integration/',
         defaultsApplied: ['cognitive_load_reduction', 'dopamine_feedback', 'zero_config']
       };
 
@@ -155,7 +155,7 @@ export class SetupOrchestrator {
         recoverable: true,
         userAction: 'Please try again or check your API token'
       };
-      
+
       result.errors.push(setupError);
       result.stepsFailed++;
       this.notifyError(setupError);
@@ -184,7 +184,7 @@ export class SetupOrchestrator {
       const apiClient = new TodoistApiClient(token, new ObsidianFetcher());
       // Test the connection by fetching user info
       await apiClient.getProjects(); // This will throw if token is invalid
-      
+
       // Store the token securely
       await this.plugin.services.token.write(token);
     } catch (error) {
@@ -194,30 +194,83 @@ export class SetupOrchestrator {
 
   private async createFolderStructure(): Promise<void> {
     const vault = this.plugin.app.vault;
-    const rootFolderName = 'Todoist';
+    const todoistIntegrationPath = '📋 01-PRODUCTIVITY/todoist-integration';
 
     try {
-      // Check if folder already exists
-      const existingFolder = vault.getAbstractFileByPath(rootFolderName);
+      // Check if the existing todoist-integration folder exists
+      const existingFolder = vault.getAbstractFileByPath(todoistIntegrationPath);
       if (existingFolder && existingFolder instanceof TFolder) {
-        return; // Folder already exists, no need to create
+        // Folder already exists, enhance it with any missing subfolders
+        await this.enhanceExistingStructure(todoistIntegrationPath);
+        return;
       }
 
-      // Create the main Todoist folder
-      await vault.createFolder(rootFolderName);
-      
-      // Create common project subfolders (will be populated dynamically)
-      const commonFolders = ['Personal', 'Work', 'Projects'];
-      for (const folderName of commonFolders) {
-        const folderPath = `${rootFolderName}/${folderName}`;
-        try {
-          await vault.createFolder(folderPath);
-        } catch (error) {
-          // Folder might already exist, continue
-        }
+      // If the main productivity folder doesn't exist, create the full structure
+      const productivityPath = '📋 01-PRODUCTIVITY';
+      const productivityFolder = vault.getAbstractFileByPath(productivityPath);
+      if (!productivityFolder) {
+        await vault.createFolder(productivityPath);
       }
+
+      // Create the todoist-integration folder
+      await vault.createFolder(todoistIntegrationPath);
+
+      // Create the enhanced folder structure
+      await this.createEnhancedFolderStructure(todoistIntegrationPath);
+
     } catch (error) {
       throw new Error('Failed to create folder structure. Please check vault permissions.');
+    }
+  }
+
+  private async enhanceExistingStructure(basePath: string): Promise<void> {
+    const vault = this.plugin.app.vault;
+
+    // Enhanced folders to ensure exist (preserving existing ones)
+    const enhancedFolders = [
+      'active-tasks',
+      'completed-tasks',
+      'recurring-tasks',
+      'project-specific'
+    ];
+
+    for (const folderName of enhancedFolders) {
+      const folderPath = `${basePath}/${folderName}`;
+      try {
+        const existingSubfolder = vault.getAbstractFileByPath(folderPath);
+        if (!existingSubfolder) {
+          await vault.createFolder(folderPath);
+        }
+      } catch (error) {
+        // Folder creation failed, continue with others
+        console.warn(`Could not create enhanced folder: ${folderPath}`);
+      }
+    }
+  }
+
+  private async createEnhancedFolderStructure(basePath: string): Promise<void> {
+    const vault = this.plugin.app.vault;
+
+    // Create comprehensive folder structure for new setups
+    const folderStructure = [
+      'p0-priority-tasks',
+      'project-contexts',
+      'tasks-inbox',
+      'all-tasks-local',
+      'task-templates',
+      'active-tasks',
+      'completed-tasks',
+      'recurring-tasks',
+      'project-specific'
+    ];
+
+    for (const folderName of folderStructure) {
+      const folderPath = `${basePath}/${folderName}`;
+      try {
+        await vault.createFolder(folderPath);
+      } catch (error) {
+        // Folder might already exist, continue
+      }
     }
   }
 
@@ -228,17 +281,17 @@ export class SetupOrchestrator {
       fadeToggle: false, // Reduce visual distractions
       autoRefreshToggle: true, // Keep data fresh automatically
       autoRefreshInterval: 30, // More frequent updates for immediate feedback
-      
+
       // Visual clarity
       renderDateIcon: true,
       renderProjectIcon: true,
       renderLabelsIcon: true,
-      
+
       // ADHD-specific optimizations
       shouldWrapLinksInParens: false, // Cleaner visual appearance
       addTaskButtonAddsPageLink: 'content' as const, // Automatic knowledge linking
       debugLogging: false, // Reduce cognitive overhead
-      
+
       // New ADHD-specific settings
       enableDopamineFeedback: true,
       enableHyperfocusProtection: true,
@@ -290,7 +343,7 @@ export class SetupOrchestrator {
   private getStepDescription(step: SetupStep): string {
     const descriptions = {
       [SetupStep.TOKEN_VALIDATION]: 'Validating your Todoist connection...',
-      [SetupStep.FOLDER_CREATION]: 'Creating your organized folder structure...',
+      [SetupStep.FOLDER_CREATION]: 'Enhancing your existing todoist-integration folder...',
       [SetupStep.DEFAULTS_APPLICATION]: 'Applying ADHD-optimized settings...',
       [SetupStep.MIGRATION_SCAN]: 'Scanning for existing tasks to import...',
       [SetupStep.MIGRATION_EXECUTION]: 'Importing your existing tasks...',

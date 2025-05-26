@@ -25,7 +25,7 @@ interface SetupState {
 
 /**
  * ADHDOnboardingModal - Zero-configuration setup experience
- * 
+ *
  * This modal provides an ADHD-optimized onboarding experience:
  * - Clear, simple steps with minimal cognitive load
  * - Immediate visual feedback and progress indication
@@ -33,13 +33,13 @@ interface SetupState {
  * - Encouraging messaging and dopamine-friendly design
  * - Error handling with clear, actionable guidance
  */
-export const ADHDOnboardingModal: React.FC<ADHDOnboardingProps> = ({ 
-  plugin, 
-  onTokenSubmit 
+export const ADHDOnboardingModal: React.FC<ADHDOnboardingProps> = ({
+  plugin,
+  onTokenSubmit
 }) => {
   const modal = ModalContext.use();
   const i18n = t().onboardingModal;
-  
+
   const [setupState, setSetupState] = useState<SetupState>({
     phase: 'welcome'
   });
@@ -57,7 +57,7 @@ export const ADHDOnboardingModal: React.FC<ADHDOnboardingProps> = ({
 
     setupOrchestrator.onSetupComplete((result) => {
       setSetupState({ phase: 'complete', result });
-      
+
       // Close modal after brief celebration
       setTimeout(() => {
         modal.close();
@@ -66,9 +66,9 @@ export const ADHDOnboardingModal: React.FC<ADHDOnboardingProps> = ({
     });
 
     setupOrchestrator.onSetupError((error) => {
-      setSetupState({ 
-        phase: 'error', 
-        error: error.message 
+      setSetupState({
+        phase: 'error',
+        error: error.message
       });
     });
 
@@ -76,9 +76,9 @@ export const ADHDOnboardingModal: React.FC<ADHDOnboardingProps> = ({
       // Start the zero-configuration setup
       await setupOrchestrator.startSetup(token);
     } catch (error) {
-      setSetupState({ 
-        phase: 'error', 
-        error: error instanceof Error ? error.message : 'Setup failed' 
+      setSetupState({
+        phase: 'error',
+        error: error instanceof Error ? error.message : 'Setup failed'
       });
     }
   }, [setupOrchestrator, modal, onTokenSubmit]);
@@ -99,22 +99,22 @@ export const ADHDOnboardingModal: React.FC<ADHDOnboardingProps> = ({
         {setupState.phase === 'welcome' && (
           <WelcomePhase onContinue={() => setSetupState({ phase: 'token-input' })} />
         )}
-        
+
         {setupState.phase === 'token-input' && (
           <TokenInputPhase onTokenSubmit={handleTokenSubmit} />
         )}
-        
+
         {setupState.phase === 'setup-progress' && setupState.progress && (
           <SetupProgressPhase progress={setupState.progress} />
         )}
-        
+
         {setupState.phase === 'complete' && setupState.result && (
           <SetupCompletePhase result={setupState.result} />
         )}
-        
+
         {setupState.phase === 'error' && (
-          <SetupErrorPhase 
-            error={setupState.error || 'Unknown error'} 
+          <SetupErrorPhase
+            error={setupState.error || 'Unknown error'}
             onRetry={handleRetry}
             onSkipToManual={handleSkipToManual}
           />
@@ -148,7 +148,7 @@ const WelcomePhase: React.FC<{ onContinue: () => void }> = ({ onContinue }) => (
           <p>Just enter your API token and we'll handle the rest</p>
         </div>
       </div>
-      
+
       <div className="feature-item">
         <span className="feature-icon">🎯</span>
         <div className="feature-text">
@@ -156,7 +156,7 @@ const WelcomePhase: React.FC<{ onContinue: () => void }> = ({ onContinue }) => (
           <p>Designed to reduce cognitive load and boost focus</p>
         </div>
       </div>
-      
+
       <div className="feature-item">
         <span className="feature-icon">🔄</span>
         <div className="feature-text">
@@ -164,7 +164,7 @@ const WelcomePhase: React.FC<{ onContinue: () => void }> = ({ onContinue }) => (
           <p>Bidirectional sync keeps everything in perfect harmony</p>
         </div>
       </div>
-      
+
       <div className="feature-item">
         <span className="feature-icon">🧠</span>
         <div className="feature-text">
@@ -186,8 +186,8 @@ const WelcomePhase: React.FC<{ onContinue: () => void }> = ({ onContinue }) => (
 );
 
 // Token Input Phase Component
-const TokenInputPhase: React.FC<{ onTokenSubmit: (token: string) => void }> = ({ 
-  onTokenSubmit 
+const TokenInputPhase: React.FC<{ onTokenSubmit: (token: string) => void }> = ({
+  onTokenSubmit
 }) => (
   <motion.div
     key="token-input"
@@ -210,14 +210,14 @@ const TokenInputPhase: React.FC<{ onTokenSubmit: (token: string) => void }> = ({
           <p>Go to <a href="https://todoist.com/help/articles/find-your-api-token-Jpzx9IIlB" target="_blank">Todoist Settings → Integrations</a></p>
         </div>
       </div>
-      
+
       <div className="help-step">
         <span className="step-number">2</span>
         <div className="step-content">
           <p>Copy your API token</p>
         </div>
       </div>
-      
+
       <div className="help-step">
         <span className="step-number">3</span>
         <div className="step-content">
@@ -227,8 +227,8 @@ const TokenInputPhase: React.FC<{ onTokenSubmit: (token: string) => void }> = ({
     </div>
 
     <div className="token-input-container">
-      <TokenInputForm 
-        onTokenSubmit={onTokenSubmit} 
+      <TokenInputForm
+        onTokenSubmit={onTokenSubmit}
         tester={TokenValidation.DefaultTester}
         placeholder="Paste your Todoist API token here..."
         submitText="Start Automatic Setup ✨"
@@ -264,7 +264,7 @@ const SetupProgressPhase: React.FC<{ progress: SetupProgress }> = ({ progress })
     <div className="progress-container">
       <div className="progress-bar-container">
         <div className="progress-bar">
-          <motion.div 
+          <motion.div
             className="progress-fill"
             initial={{ width: 0 }}
             animate={{ width: `${progress.progressPercentage}%` }}
@@ -309,8 +309,9 @@ const SetupProgressPhase: React.FC<{ progress: SetupProgress }> = ({ progress })
     <div className="setup-tips">
       <h4>💡 While we set things up:</h4>
       <ul>
-        <li>Your tasks will be organized in a clean "Todoist/" folder</li>
+        <li>Your existing "📋 01-PRODUCTIVITY/todoist-integration" folder will be enhanced</li>
         <li>ADHD-friendly defaults are being applied automatically</li>
+        <li>Your current folder structure will be preserved and improved</li>
         <li>Existing tasks will be imported if found</li>
         <li>Bidirectional sync will keep everything in harmony</li>
       </ul>
@@ -345,12 +346,12 @@ const SetupCompletePhase: React.FC<{ result: SetupResult }> = ({ result }) => (
         <span className="summary-icon">⏱️</span>
         <span>Setup completed in {Math.round(result.completionTime / 1000)}s</span>
       </div>
-      
+
       <div className="summary-item">
         <span className="summary-icon">✅</span>
         <span>{result.stepsCompleted} steps completed successfully</span>
       </div>
-      
+
       {result.migrationResults && result.migrationResults.tasksImported > 0 && (
         <div className="summary-item">
           <span className="summary-icon">📦</span>
@@ -381,10 +382,10 @@ const SetupCompletePhase: React.FC<{ result: SetupResult }> = ({ result }) => (
 );
 
 // Setup Error Phase Component
-const SetupErrorPhase: React.FC<{ 
-  error: string; 
-  onRetry: () => void; 
-  onSkipToManual: () => void; 
+const SetupErrorPhase: React.FC<{
+  error: string;
+  onRetry: () => void;
+  onSkipToManual: () => void;
 }> = ({ error, onRetry, onSkipToManual }) => (
   <motion.div
     key="setup-error"
@@ -416,7 +417,7 @@ const SetupErrorPhase: React.FC<{
       >
         Try Again 🔄
       </motion.button>
-      
+
       <motion.button
         className="adhd-secondary-button"
         onClick={onSkipToManual}
@@ -449,6 +450,6 @@ function getStepDisplayName(step: string): string {
     'migration_execution': 'Imported existing tasks',
     'sync_initialization': 'Initialized sync engine'
   };
-  
+
   return displayNames[step] || step;
 }
