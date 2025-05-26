@@ -100,7 +100,7 @@ export class FileSyncManager {
   }
 
   /**
-   * Fetch all tasks using the existing Todoist adapter
+   * Fetch all tasks using the subscription system with no filter
    */
   private async fetchAllTasks(): Promise<Task[]> {
     try {
@@ -109,23 +109,25 @@ export class FileSyncManager {
         throw new Error('Todoist service not ready');
       }
 
-      // Use the subscription system to get all tasks
+      // Use the subscription system with no filter to get all tasks
       return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
           reject(new Error('Timeout waiting for tasks'));
         }, 10000); // 10 second timeout
 
+        // Use a subscription with a filter that gets all tasks
         const [unsubscribe, refresh] = this.plugin.services.todoist.subscribe(
-          'all', // Get all tasks
+          'all', // Use 'all' filter to get all tasks
           (result) => {
             clearTimeout(timeout);
             unsubscribe();
 
             if (result.type === 'success') {
-              const tasks = result.data.map((t: any) => this.hydrateTask(t));
+              // The subscription result has 'tasks' property
+              const tasks = Array.isArray(result.tasks) ? result.tasks : [];
               resolve(tasks);
             } else {
-              reject(new Error('Failed to fetch tasks: ' + result.error));
+              reject(new Error('Failed to fetch tasks: ' + (result.type === 'error' ? result.kind : 'Unknown error')));
             }
           }
         );
@@ -139,30 +141,7 @@ export class FileSyncManager {
     }
   }
 
-  /**
-   * Hydrate API task with project/section/label data
-   */
-  private hydrateTask(apiTask: any): Task {
-    const data = this.plugin.services.todoist.data();
-    const project = data.projects.byId(apiTask.projectId);
-    const section = apiTask.sectionId ? data.sections.byId(apiTask.sectionId) : undefined;
-    const labels = apiTask.labels.map((id: string) => data.labels.byName(id)).filter(Boolean);
-
-    return {
-      id: apiTask.id,
-      createdAt: apiTask.createdAt,
-      content: apiTask.content,
-      description: apiTask.description,
-      project: project || { id: apiTask.projectId, name: 'Unknown Project', order: 0, parentId: null, isInboxProject: true, color: 'grey' },
-      section: section,
-      parentId: apiTask.parentId,
-      labels: labels,
-      priority: apiTask.priority,
-      due: apiTask.due,
-      duration: apiTask.duration,
-      order: apiTask.order,
-    };
-  }
+  // Note: hydrateTask method removed since subscription system returns already hydrated Task objects
 
   /**
    * Organize tasks into categories for file creation
