@@ -38,6 +38,7 @@ export default class TodoistPlugin extends Plugin {
 
   private async loadApiClient(): Promise<void> {
     const accessor = this.services.token;
+    const settings = useSettingsStore.getState();
 
     if (await accessor.exists()) {
       const token = await accessor.read();
@@ -45,12 +46,25 @@ export default class TodoistPlugin extends Plugin {
       return;
     }
 
-    this.services.modals.onboarding({
-      onTokenSubmit: async (token) => {
-        await accessor.write(token);
-        await this.services.todoist.initialize(new TodoistApiClient(token, new ObsidianFetcher()));
-      },
-    });
+    // Use ADHD-optimized onboarding if zero-config mode is enabled
+    if (settings.zeroConfigMode) {
+      this.services.modals.adhdOnboarding({
+        plugin: this,
+        onTokenSubmit: async (token) => {
+          // Token is already saved by SetupOrchestrator
+          // Just initialize the API client
+          await this.services.todoist.initialize(new TodoistApiClient(token, new ObsidianFetcher()));
+        },
+      });
+    } else {
+      // Fall back to original onboarding
+      this.services.modals.onboarding({
+        onTokenSubmit: async (token) => {
+          await accessor.write(token);
+          await this.services.todoist.initialize(new TodoistApiClient(token, new ObsidianFetcher()));
+        },
+      });
+    }
   }
 
   async loadOptions(): Promise<void> {

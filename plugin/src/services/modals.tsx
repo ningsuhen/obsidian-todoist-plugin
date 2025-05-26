@@ -5,6 +5,7 @@ import { type Root, createRoot } from "react-dom/client";
 import type TodoistPlugin from "..";
 import { CreateTaskModal } from "../ui/createTaskModal";
 import { OnboardingModal } from "../ui/onboardingModal";
+import { ADHDOnboardingModal } from "../ui/onboardingModal/ADHDOnboardingModal";
 
 type ModalOptions = {
   title?: string;
@@ -70,6 +71,13 @@ export class ModalHandler {
   public onboarding(props: React.ComponentProps<typeof OnboardingModal>) {
     new ReactModal(this.plugin, OnboardingModal, props, {
       title: "Sync with Todoist Setup",
+    }).open();
+  }
+
+  public adhdOnboarding(props: React.ComponentProps<typeof ADHDOnboardingModal>) {
+    new ReactModal(this.plugin, ADHDOnboardingModal, props, {
+      title: "🧠 ADHD-Optimized Todoist Setup",
+      dontCloseOnExternalClick: true, // Prevent accidental closure during setup
     }).open();
   }
 

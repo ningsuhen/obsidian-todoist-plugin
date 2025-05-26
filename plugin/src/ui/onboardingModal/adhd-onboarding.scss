@@ -1,0 +1,594 @@
+/* ADHD-Optimized Onboarding Modal Styles */
+
+.adhd-onboarding-modal {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 2rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.6;
+  color: var(--text-normal);
+  
+  /* ADHD-friendly: Reduce visual noise */
+  background: var(--background-primary);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.adhd-onboarding-phase {
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Welcome Phase Styles */
+.welcome-phase {
+  text-align: center;
+  
+  .welcome-header {
+    margin-bottom: 2rem;
+    
+    h2 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--text-accent);
+      /* ADHD-friendly: Clear visual hierarchy */
+    }
+    
+    .welcome-subtitle {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      margin-bottom: 0;
+    }
+  }
+  
+  .welcome-features {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+    text-align: left;
+    
+    .feature-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      padding: 1rem;
+      background: var(--background-secondary);
+      border-radius: 8px;
+      border: 1px solid var(--background-modifier-border);
+      
+      /* ADHD-friendly: Subtle hover feedback */
+      transition: all 0.2s ease;
+      
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+      
+      .feature-icon {
+        font-size: 1.5rem;
+        flex-shrink: 0;
+      }
+      
+      .feature-text {
+        strong {
+          display: block;
+          font-weight: 600;
+          color: var(--text-normal);
+          margin-bottom: 0.25rem;
+        }
+        
+        p {
+          margin: 0;
+          font-size: 0.9rem;
+          color: var(--text-muted);
+        }
+      }
+    }
+  }
+}
+
+/* Token Input Phase Styles */
+.token-input-phase {
+  .phase-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    
+    h3 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--text-accent);
+    }
+    
+    .phase-subtitle {
+      color: var(--text-muted);
+      margin-bottom: 0;
+    }
+  }
+  
+  .token-help {
+    margin-bottom: 2rem;
+    
+    .help-step {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      
+      .step-number {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        background: var(--interactive-accent);
+        color: white;
+        border-radius: 50%;
+        font-weight: 600;
+        font-size: 0.9rem;
+        flex-shrink: 0;
+      }
+      
+      .step-content {
+        p {
+          margin: 0;
+          
+          a {
+            color: var(--link-color);
+            text-decoration: none;
+            
+            &:hover {
+              text-decoration: underline;
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  .token-input-container {
+    margin-bottom: 2rem;
+    
+    /* Enhance existing token input form */
+    .token-input-form {
+      .token-input {
+        width: 100%;
+        padding: 1rem;
+        border: 2px solid var(--background-modifier-border);
+        border-radius: 8px;
+        font-size: 1rem;
+        background: var(--background-primary);
+        color: var(--text-normal);
+        
+        /* ADHD-friendly: Clear focus states */
+        transition: border-color 0.2s ease;
+        
+        &:focus {
+          outline: none;
+          border-color: var(--interactive-accent);
+          box-shadow: 0 0 0 3px rgba(var(--interactive-accent-rgb), 0.1);
+        }
+        
+        &::placeholder {
+          color: var(--text-faint);
+        }
+      }
+      
+      .submit-button {
+        width: 100%;
+        margin-top: 1rem;
+      }
+    }
+  }
+  
+  .reassurance-message {
+    text-align: center;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    background: var(--background-secondary);
+    padding: 1rem;
+    border-radius: 8px;
+    border-left: 4px solid var(--color-green);
+  }
+}
+
+/* Setup Progress Phase Styles */
+.setup-progress-phase {
+  .progress-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    
+    h3 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--text-accent);
+    }
+    
+    .progress-subtitle {
+      color: var(--text-muted);
+      margin-bottom: 0;
+    }
+  }
+  
+  .progress-container {
+    margin-bottom: 2rem;
+    
+    .progress-bar-container {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      
+      .progress-bar {
+        flex: 1;
+        height: 8px;
+        background: var(--background-modifier-border);
+        border-radius: 4px;
+        overflow: hidden;
+        
+        .progress-fill {
+          height: 100%;
+          background: linear-gradient(90deg, var(--interactive-accent), var(--color-green));
+          border-radius: 4px;
+          transition: width 0.5s ease;
+        }
+      }
+      
+      .progress-percentage {
+        font-weight: 600;
+        color: var(--interactive-accent);
+        min-width: 3rem;
+        text-align: right;
+      }
+    }
+    
+    .current-operation {
+      text-align: center;
+      margin-bottom: 1.5rem;
+      
+      .operation-text {
+        font-size: 1.1rem;
+        font-weight: 500;
+        color: var(--text-normal);
+        padding: 0.75rem 1.5rem;
+        background: var(--background-secondary);
+        border-radius: 8px;
+        border: 1px solid var(--background-modifier-border);
+      }
+    }
+    
+    .progress-steps {
+      margin-bottom: 1rem;
+      
+      .completed-step {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0;
+        font-size: 0.9rem;
+        color: var(--color-green);
+        
+        /* ADHD-friendly: Satisfying completion feedback */
+        animation: slideInLeft 0.3s ease;
+      }
+    }
+    
+    .time-remaining {
+      text-align: center;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+  }
+  
+  .setup-tips {
+    background: var(--background-secondary);
+    padding: 1.5rem;
+    border-radius: 8px;
+    border-left: 4px solid var(--interactive-accent);
+    
+    h4 {
+      margin-top: 0;
+      margin-bottom: 1rem;
+      color: var(--text-accent);
+    }
+    
+    ul {
+      margin: 0;
+      padding-left: 1.5rem;
+      
+      li {
+        margin-bottom: 0.5rem;
+        color: var(--text-muted);
+        
+        &:last-child {
+          margin-bottom: 0;
+        }
+      }
+    }
+  }
+}
+
+/* Setup Complete Phase Styles */
+.setup-complete-phase {
+  text-align: center;
+  
+  .celebration-container {
+    margin-bottom: 2rem;
+    
+    .celebration-icon {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+      
+      /* ADHD-friendly: Satisfying celebration animation */
+      animation: bounce 1s ease infinite alternate;
+    }
+    
+    h3 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--color-green);
+    }
+    
+    .celebration-message {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      margin-bottom: 0;
+    }
+  }
+  
+  .setup-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+    
+    .summary-item {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      background: var(--background-secondary);
+      border-radius: 6px;
+      
+      .summary-icon {
+        font-size: 1.2rem;
+      }
+    }
+  }
+  
+  .next-steps {
+    text-align: left;
+    background: var(--background-secondary);
+    padding: 1.5rem;
+    border-radius: 8px;
+    border-left: 4px solid var(--color-green);
+    margin-bottom: 2rem;
+    
+    h4 {
+      margin-top: 0;
+      margin-bottom: 1rem;
+      color: var(--text-accent);
+    }
+    
+    ul {
+      margin: 0;
+      padding-left: 1.5rem;
+      
+      li {
+        margin-bottom: 0.5rem;
+        color: var(--text-muted);
+        
+        &:last-child {
+          margin-bottom: 0;
+        }
+      }
+    }
+  }
+  
+  .auto-close-notice {
+    font-size: 0.9rem;
+    color: var(--text-faint);
+    font-style: italic;
+  }
+}
+
+/* Setup Error Phase Styles */
+.setup-error-phase {
+  text-align: center;
+  
+  .error-header {
+    margin-bottom: 2rem;
+    
+    .error-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      color: var(--color-orange);
+    }
+    
+    h3 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--color-orange);
+    }
+    
+    .error-subtitle {
+      color: var(--text-muted);
+      margin-bottom: 0;
+    }
+  }
+  
+  .error-details {
+    margin-bottom: 2rem;
+    
+    .error-message {
+      padding: 1rem;
+      background: var(--background-secondary);
+      border: 1px solid var(--color-orange);
+      border-radius: 8px;
+      color: var(--text-normal);
+      font-family: var(--font-monospace);
+      font-size: 0.9rem;
+    }
+  }
+  
+  .error-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-bottom: 2rem;
+  }
+  
+  .error-help {
+    text-align: left;
+    background: var(--background-secondary);
+    padding: 1.5rem;
+    border-radius: 8px;
+    border-left: 4px solid var(--color-orange);
+    
+    h4 {
+      margin-top: 0;
+      margin-bottom: 1rem;
+      color: var(--text-accent);
+    }
+    
+    ul {
+      margin: 0;
+      padding-left: 1.5rem;
+      
+      li {
+        margin-bottom: 0.5rem;
+        color: var(--text-muted);
+        
+        &:last-child {
+          margin-bottom: 0;
+        }
+      }
+    }
+  }
+}
+
+/* ADHD-Optimized Button Styles */
+.adhd-primary-button {
+  background: var(--interactive-accent);
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  
+  /* ADHD-friendly: Clear, satisfying interactions */
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: var(--interactive-accent-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(var(--interactive-accent-rgb), 0.3);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+  
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(var(--interactive-accent-rgb), 0.3);
+  }
+}
+
+.adhd-secondary-button {
+  background: transparent;
+  color: var(--text-muted);
+  border: 2px solid var(--background-modifier-border);
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: var(--background-secondary);
+    border-color: var(--interactive-accent);
+    color: var(--text-normal);
+  }
+  
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(var(--interactive-accent-rgb), 0.1);
+  }
+}
+
+/* ADHD-Friendly Animations */
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes bounce {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+/* Responsive Design for ADHD Users */
+@media (max-width: 768px) {
+  .adhd-onboarding-modal {
+    padding: 1.5rem;
+    max-width: 100%;
+  }
+  
+  .welcome-features {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .error-actions {
+    flex-direction: column;
+  }
+  
+  .adhd-primary-button,
+  .adhd-secondary-button {
+    width: 100%;
+  }
+}
+
+/* Reduced Motion Support for ADHD Users */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  .celebration-icon {
+    animation: none;
+  }
+}
