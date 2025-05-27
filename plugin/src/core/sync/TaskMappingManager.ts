@@ -260,7 +260,7 @@ export class TaskMappingManager {
   }
 
   /**
-   * Load mappings from the mapping file
+   * Load mappings from the mapping file with corruption recovery
    */
   private async loadMappings(): Promise<void> {
     try {
@@ -272,18 +272,46 @@ export class TaskMappingManager {
       }
 
       const content = await this.plugin.app.vault.read(file);
-      const data = JSON.parse(content);
+
+      // Try to parse JSON with corruption recovery
+      let data;
+      try {
+        data = JSON.parse(content);
+      } catch (jsonError) {
+        console.warn('Corrupted mappings file detected, attempting recovery:', jsonError);
+
+        // Try to recover by creating backup and starting fresh
+        const backupPath = `📋 01-PRODUCTIVITY/todoist-integration/⚙️ System/corrupted-mappings-backup-${Date.now()}.json`;
+        try {
+          await this.plugin.app.vault.create(backupPath, content);
+          console.log(`Corrupted mappings backed up to: ${backupPath}`);
+        } catch (backupError) {
+          console.warn('Failed to backup corrupted mappings:', backupError);
+        }
+
+        // Delete corrupted file and start fresh
+        await this.plugin.app.vault.delete(file);
+        console.log('Corrupted mappings file deleted, starting with fresh mappings');
+
+        this.mappings.clear();
+        this.reverseMap.clear();
+        return;
+      }
 
       this.mappings.clear();
       this.reverseMap.clear();
 
       for (const mapping of data.mappings || []) {
-        this.mappings.set(mapping.todoistId, mapping);
-        const obsidianKey = this.getObsidianKey(mapping.obsidianFile, mapping.obsidianLineNumber);
-        this.reverseMap.set(obsidianKey, mapping.todoistId);
+        if (mapping.todoistId && mapping.obsidianFile !== undefined && mapping.obsidianLineNumber !== undefined) {
+          this.mappings.set(mapping.todoistId, mapping);
+          const obsidianKey = this.getObsidianKey(mapping.obsidianFile, mapping.obsidianLineNumber);
+          this.reverseMap.set(obsidianKey, mapping.todoistId);
+        }
       }
+
+      console.log(`Loaded ${this.mappings.size} task mappings successfully`);
     } catch (error) {
-      console.warn('Failed to load task mappings:', error);
+      console.warn('Failed to load task mappings, starting fresh:', error);
       // Start with empty mappings if loading fails
       this.mappings.clear();
       this.reverseMap.clear();

@@ -61,7 +61,7 @@ export class ConflictResolver {
       if (!obsidianTask.todoistId) continue;
 
       const todoistTask = todoistMap.get(obsidianTask.todoistId);
-      
+
       if (!todoistTask) {
         // Task deleted in Todoist
         conflicts.push({
@@ -106,7 +106,7 @@ export class ConflictResolver {
     for (const conflict of conflicts) {
       try {
         const resolution = this.determineAutoResolution(conflict);
-        
+
         if (resolution === ConflictResolution.MANUAL) {
           result.manual.push(conflict);
           continue;
@@ -114,10 +114,10 @@ export class ConflictResolver {
 
         await this.applyResolution(conflict, resolution);
         result.resolved++;
-        
+
         // Log for user awareness
         this.logConflictResolution(conflict, resolution);
-        
+
       } catch (error) {
         const errorMsg = `Failed to resolve conflict for task ${conflict.todoistId}: ${error}`;
         result.errors.push(errorMsg);
@@ -133,17 +133,22 @@ export class ConflictResolver {
 
   /**
    * Detect the type of conflict between versions
+   * Only flags actual conflicts that need resolution, not normal differences
    */
   private detectConflictType(obsidian: ParsedTask, todoist: Task): ConflictType | null {
-    const contentChanged = obsidian.content.trim() !== todoist.content.trim();
-    const completionChanged = obsidian.completed !== false; // Todoist tasks in sync are always incomplete
-    const priorityChanged = obsidian.priority !== todoist.priority;
-    
-    const obsidianDue = obsidian.dueDate ? new Date(obsidian.dueDate).toDateString() : null;
-    const todoistDue = todoist.due ? new Date(todoist.due.date).toDateString() : null;
-    const dueDateChanged = obsidianDue !== todoistDue;
+    // Only detect completion as conflict if task was actually completed in Obsidian
+    const completionChanged = obsidian.completed === true;
 
-    // Determine conflict type based on what changed
+    // Only detect content changes if they're significant (not just formatting differences)
+    const contentChanged = this.isSignificantContentChange(obsidian.content, todoist.content);
+
+    // Only detect priority changes if they're meaningful (not default vs default)
+    const priorityChanged = this.isSignificantPriorityChange(obsidian.priority, todoist.priority);
+
+    // Only detect due date changes if they're actual date differences (not formatting)
+    const dueDateChanged = this.isSignificantDueDateChange(obsidian.dueDate, todoist.due);
+
+    // Only return conflicts for changes that actually need user attention
     if (completionChanged && contentChanged) {
       return ConflictType.BOTH_MODIFIED;
     } else if (completionChanged) {
@@ -156,7 +161,75 @@ export class ConflictResolver {
       return ConflictType.DUE_DATE_CHANGED;
     }
 
-    return null;
+    return null; // No actual conflict detected
+  }
+
+  /**
+   * Check if content change is significant enough to be a conflict
+   */
+  private isSignificantContentChange(obsidianContent: string, todoistContent: string): boolean {
+    const obsidianClean = this.cleanContentForComparison(obsidianContent);
+    const todoistClean = this.cleanContentForComparison(todoistContent);
+
+    // Not a conflict if content is essentially the same
+    if (obsidianClean === todoistClean) return false;
+
+    // Not a conflict if difference is minimal (less than 10% change)
+    const lengthDiff = Math.abs(obsidianClean.length - todoistClean.length);
+    const maxLength = Math.max(obsidianClean.length, todoistClean.length);
+    if (maxLength > 0 && lengthDiff / maxLength < 0.1) return false;
+
+    // Not a conflict if one is just a subset of the other (likely formatting)
+    if (obsidianClean.includes(todoistClean) || todoistClean.includes(obsidianClean)) return false;
+
+    return true; // Significant content difference
+  }
+
+  /**
+   * Clean content for comparison by removing formatting and metadata
+   */
+  private cleanContentForComparison(content: string): string {
+    return content
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .replace(/[🔴🟡🔵⚪📅#]/g, '') // Remove priority and date emojis
+      .replace(/\*\*overdue:\s*\d+\/\d+\/\d+\*\*/gi, '') // Remove overdue markers
+      .replace(/\d+\/\d+\/\d+/g, '') // Remove dates
+      .replace(/#\w+/g, '') // Remove hashtags
+      .replace(/<!--.*?-->/g, '') // Remove HTML comments
+      .trim();
+  }
+
+  /**
+   * Check if priority change is significant
+   */
+  private isSignificantPriorityChange(obsidianPriority: number, todoistPriority: number): boolean {
+    // Default priority is 1, so 1 vs 1 is not a conflict
+    if (obsidianPriority === todoistPriority) return false;
+
+    // If both are default priority (1), no conflict
+    if (obsidianPriority === 1 && todoistPriority === 1) return false;
+
+    // Only flag as conflict if there's a meaningful priority difference
+    return Math.abs(obsidianPriority - todoistPriority) > 0;
+  }
+
+  /**
+   * Check if due date change is significant
+   */
+  private isSignificantDueDateChange(obsidianDueDate: string | null, todoistDue: any): boolean {
+    const obsidianDate = obsidianDueDate ? new Date(obsidianDueDate).toDateString() : null;
+    const todoistDate = todoistDue ? new Date(todoistDue.date).toDateString() : null;
+
+    // No conflict if both are null
+    if (!obsidianDate && !todoistDate) return false;
+
+    // No conflict if dates are the same
+    if (obsidianDate === todoistDate) return false;
+
+    // Only flag as conflict if there's an actual date difference
+    return obsidianDate !== todoistDate;
   }
 
   /**
@@ -176,14 +249,14 @@ export class ConflictResolver {
         // ADHD Rule: Higher priority wins (urgency preservation)
         const obsidianPriority = conflict.obsidianVersion.priority;
         const todoistPriority = conflict.todoistVersion.priority;
-        return obsidianPriority > todoistPriority ? 
+        return obsidianPriority > todoistPriority ?
           ConflictResolution.OBSIDIAN_WINS : ConflictResolution.TODOIST_WINS;
 
       case ConflictType.DUE_DATE_CHANGED:
         // ADHD Rule: Earlier due date wins (urgency preservation)
         const obsidianDue = conflict.obsidianVersion.dueDate ? new Date(conflict.obsidianVersion.dueDate) : null;
         const todoistDue = conflict.todoistVersion.due ? new Date(conflict.todoistVersion.due.date) : null;
-        
+
         if (!obsidianDue && todoistDue) return ConflictResolution.TODOIST_WINS;
         if (obsidianDue && !todoistDue) return ConflictResolution.OBSIDIAN_WINS;
         if (obsidianDue && todoistDue) {

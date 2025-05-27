@@ -6,6 +6,8 @@ import { TaskFormatter, TaskCollectionUtils } from './TaskFormatter';
 import { buildTaskTree, type TaskTree } from '@/data/transformations/relationships';
 import { ConflictResolver, type TaskConflict } from './ConflictResolver';
 import { ConflictResolutionModal } from '@/ui/conflictModal/ConflictResolutionModal';
+import { SafeSyncStrategy } from './SafeSyncStrategy';
+import { TodoistBackupManager } from '../backup/TodoistBackupManager';
 import type { Project } from '@/api/domain/project';
 import type { Section } from '@/api/domain/section';
 import type { Label } from '@/api/domain/label';
@@ -31,12 +33,16 @@ export class FileSyncManager {
   private lastSyncTime: Date | null = null;
   private mappingManager: TaskMappingManager;
   private conflictResolver: ConflictResolver;
+  private safeSyncStrategy: SafeSyncStrategy;
+  private backupManager: TodoistBackupManager;
 
   constructor(plugin: TodoistPlugin) {
     this.plugin = plugin;
     this.basePath = '📋 01-PRODUCTIVITY/todoist-integration';
     this.mappingManager = new TaskMappingManager(plugin);
     this.conflictResolver = new ConflictResolver(plugin);
+    this.safeSyncStrategy = new SafeSyncStrategy(plugin);
+    this.backupManager = new TodoistBackupManager(plugin);
   }
 
   /**
@@ -160,16 +166,30 @@ export class FileSyncManager {
   }
 
   /**
-   * Sync changes from Obsidian back to Todoist with conflict resolution
-   * This method detects modifications in markdown files and resolves conflicts intelligently
+   * Sync changes from Obsidian back to Todoist with backup and safe metadata preservation
+   * This method creates backups and only syncs safe changes to prevent data corruption
    */
-  async syncObsidianChangesToTodoist(): Promise<{ updated: number; completed: number; conflicts: number; errors: string[] }> {
-    const result = { updated: 0, completed: 0, conflicts: 0, errors: [] as string[] };
+  async syncObsidianChangesToTodoist(skipConflictDetection: boolean = false): Promise<{
+    updated: number;
+    completed: number;
+    conflicts: number;
+    backupCreated: boolean;
+    backupFile: string;
+    errors: string[]
+  }> {
+    const result = {
+      updated: 0,
+      completed: 0,
+      conflicts: 0,
+      backupCreated: false,
+      backupFile: '',
+      errors: [] as string[]
+    };
 
     try {
       await this.mappingManager.initialize();
 
-      // Get current Todoist tasks for conflict detection
+      // Get current Todoist tasks for backup and comparison
       const todoistTasks = await this.fetchAllTasks();
 
       // Get all markdown files and extract Obsidian tasks
@@ -188,41 +208,46 @@ export class FileSyncManager {
         }
       }
 
-      // Detect conflicts between Obsidian and Todoist versions
-      const conflicts = await this.conflictResolver.detectConflicts(
-        obsidianTasks,
-        todoistTasks,
-        this.lastSyncTime || new Date(Date.now() - 24 * 60 * 60 * 1000) // Default to 24h ago
-      );
+      // Use safe sync strategy with automatic backup
+      const safeSyncResult = await this.safeSyncStrategy.safeSyncToTodoist(obsidianTasks, todoistTasks);
 
-      if (conflicts.length > 0) {
-        // Resolve conflicts automatically where possible
-        const resolutionResult = await this.conflictResolver.resolveConflicts(conflicts);
+      // Update result with safe sync outcomes
+      result.backupCreated = safeSyncResult.backupCreated;
+      result.backupFile = safeSyncResult.backupFile;
+      result.completed = safeSyncResult.operations.completed;
+      result.updated = safeSyncResult.operations.contentUpdated +
+                      safeSyncResult.operations.priorityUpdated +
+                      safeSyncResult.operations.dueDateUpdated;
+      result.errors.push(...safeSyncResult.errors);
 
-        result.conflicts = conflicts.length;
-        result.updated += resolutionResult.resolved;
-        result.errors.push(...resolutionResult.errors);
+      // Detect and handle conflicts only if not skipped
+      if (!skipConflictDetection) {
+        const conflicts = await this.conflictResolver.detectConflicts(
+          obsidianTasks,
+          todoistTasks,
+          this.lastSyncTime || new Date(Date.now() - 24 * 60 * 60 * 1000)
+        );
 
-        // Handle manual conflicts if any
-        if (resolutionResult.manual.length > 0) {
-          await this.showManualConflictResolution(resolutionResult.manual);
-        }
-      } else {
-        // No conflicts - proceed with simple sync
-        for (const obsidianTask of obsidianTasks) {
-          if (obsidianTask.completed && obsidianTask.todoistId) {
-            try {
-              await this.plugin.services.todoist.actions.closeTask(obsidianTask.todoistId);
-              result.completed++;
-            } catch (error) {
-              result.errors.push(`Failed to complete task ${obsidianTask.todoistId}: ${error}`);
-            }
+        if (conflicts.length > 0) {
+          result.conflicts = conflicts.length;
+
+          // Only show manual resolution for conflicts not handled by safe sync
+          const unhandledConflicts = conflicts.filter(c =>
+            !safeSyncResult.preservedMetadata.some(p => p.taskId === c.todoistId)
+          );
+
+          if (unhandledConflicts.length > 0) {
+            await this.showManualConflictResolution(unhandledConflicts);
           }
         }
+      } else {
+        console.log("⏭️ Conflict detection skipped as requested");
       }
 
-      // Update last sync time
-      this.lastSyncTime = new Date();
+      // Update last sync time only if backup was successful
+      if (safeSyncResult.backupCreated) {
+        this.lastSyncTime = new Date();
+      }
 
     } catch (error) {
       const errorMsg = `Failed to sync Obsidian changes: ${error}`;
