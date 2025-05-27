@@ -147,6 +147,10 @@ This principle eliminates cognitive overhead for ADHD users by removing decision
 - **REQ-F005-14:** Accommodate time blindness with visual time indicators
 - **REQ-F005-15:** Support time estimation learning and improvement
 - **REQ-F005-16:** Offer time-based task suggestions and reminders
+- **REQ-F005-17:** Support Todoist duration estimates with ⏱️ syntax in Obsidian
+- **REQ-F005-18:** Bidirectionally sync time duration estimates between platforms
+- **REQ-F005-19:** Parse duration formats: minutes (30min), hours (2h), days (1d)
+- **REQ-F005-20:** Provide visual duration indicators for better time planning
 
 ### F6. Enhanced Task Management (12 requirements)
 
@@ -279,7 +283,7 @@ This principle eliminates cognitive overhead for ADHD users by removing decision
 
 ---
 
-**Total Requirements:** 104 functional + 28 non-functional = 132 total
+**Total Requirements:** 108 functional + 28 non-functional = 136 total
 **Critical Path:** Painless setup → ADHD core features → Knowledge integration
 **Success Criteria:** <2 min setup, 0 config decisions, 40% cognitive load reduction
 **Document Status:** Requirements Pass Complete ✅

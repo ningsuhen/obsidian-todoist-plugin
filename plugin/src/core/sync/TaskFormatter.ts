@@ -1,4 +1,6 @@
+import type { Duration } from '@/api/domain/task';
 import type { Task } from '@/data/task';
+import { DurationParser } from './DurationParser';
 
 /**
  * Handles formatting tasks as markdown with embedded metadata for mapping
@@ -9,6 +11,11 @@ export class TaskFormatter {
    */
   static formatTaskAsMarkdown(task: Task, includeMetadata: boolean = true): string {
     let line = `- [ ] ${task.content}`;
+
+    // Add duration if present (NEW: Duration support)
+    if (task.duration) {
+      line += ` ${DurationParser.formatDuration(task.duration)}`;
+    }
 
     // Add priority indicator
     if (task.priority > 1) {
@@ -58,6 +65,7 @@ export class TaskFormatter {
       description: task.description || '',
       priority: task.priority,
       due: task.due?.date || null,
+      duration: task.duration || null, // NEW: Include duration in hash
       labels: task.labels.map(l => l.name).sort(),
       project: task.project.id,
       section: task.section?.id || null,
@@ -231,8 +239,17 @@ export class TaskFormatter {
    * Parse a markdown task line to extract task content
    */
   static extractTaskContent(markdownLine: string): string | null {
-    const match = markdownLine.match(/^- \[([ x])\] (.+?)(?:\s+🔴|📅|#|\s*<!--)/);
-    return match ? match[2].trim() : null;
+    // More comprehensive regex to handle all metadata patterns
+    const match = markdownLine.match(/^- \[([ x])\] (.+?)(?:\s+(?:⏱️|🔴|🟡|🔵|⚪|📅|#)|\s*<!--|$)/);
+    if (!match) return null;
+
+    let content = match[2].trim();
+
+    // Remove any remaining metadata that might be in the content
+    content = DurationParser.removeDuration(content);
+    content = content.replace(/\s*(🔴|🟡|🔵|⚪|📅|#\w+)\s*.*$/, '').trim();
+
+    return content || null;
   }
 
   /**
@@ -305,6 +322,9 @@ export class TaskFormatter {
     }
     // null priority means "no change" - preserve original Todoist priority
 
+    // Extract duration (NEW: Duration support)
+    const duration = DurationParser.parseDuration(markdownLine);
+
     // Extract labels
     const labelMatches = markdownLine.match(/#(\w+)/g);
     const labels = labelMatches ? labelMatches.map(l => l.substring(1)) : [];
@@ -317,6 +337,7 @@ export class TaskFormatter {
       isOverdue: !!overdueDate,
       priority,
       labels,
+      duration, // NEW: Include duration in parsed result
     };
   }
 
@@ -404,6 +425,7 @@ export interface ParsedTask {
   isOverdue: boolean;
   priority: number | null; // null means "preserve original priority"
   labels: string[];
+  duration: Duration | null; // NEW: Duration support
 }
 
 /**
