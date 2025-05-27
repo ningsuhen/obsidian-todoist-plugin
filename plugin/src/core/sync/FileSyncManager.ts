@@ -49,6 +49,206 @@ export class FileSyncManager {
   }
 
   /**
+   * Check if a file path should be included in sync operations
+   */
+  private shouldSyncFile(filePath: string): boolean {
+    const relativePath = filePath.replace(`${this.basePath}/`, '');
+
+    // Never sync System/ folder (plugin internals)
+    if (relativePath.startsWith('⚙️ System/')) {
+      return false;
+    }
+
+    // Never sync Local/ folder (user workspace - any structure allowed)
+    if (relativePath.startsWith('📁 Local/')) {
+      return false;
+    }
+
+    // Never sync .agent-guidelines.md (LLM instructions)
+    if (relativePath === '.agent-guidelines.md') {
+      return false;
+    }
+
+    // Auto sync everything else in the integration directory
+    return true;
+  }
+
+  /**
+   * Initialize the directory structure including user workspace
+   */
+  async initializeDirectoryStructure(): Promise<void> {
+    const vault = this.plugin.app.vault;
+
+    // Core sync directories
+    const syncDirectories = [
+      `${this.basePath}/🗂️ Projects`,
+      `${this.basePath}/🏷️ Labels`,
+      `${this.basePath}/⚙️ System`,
+      `${this.basePath}/📁 Local`,
+    ];
+
+    for (const dir of syncDirectories) {
+      const exists = vault.getAbstractFileByPath(dir);
+      if (!exists) {
+        try {
+          await vault.createFolder(dir);
+        } catch (error) {
+          console.warn(`Could not create directory ${dir}:`, error);
+        }
+      }
+    }
+
+    // Create agent guidelines file
+    await this.createAgentGuidelinesFile();
+
+    // Create user workspace welcome file
+    await this.createLocalWorkspaceWelcome();
+  }
+
+  /**
+   * Create the agent guidelines file in the integration directory
+   */
+  private async createAgentGuidelinesFile(): Promise<void> {
+    const filePath = `${this.basePath}/.agent-guidelines.md`;
+    const vault = this.plugin.app.vault;
+
+    const exists = vault.getAbstractFileByPath(filePath);
+    if (!exists) {
+      const content = `# 🤖 Agent Guidelines: Todoist Integration Directory
+
+**FOR AI ASSISTANTS:** This file explains how to help users work with the ADHD-Optimized Todoist Plugin.
+
+## 📁 Directory Structure & Sync Rules
+
+\`\`\`
+📋 01-PRODUCTIVITY/todoist-integration/
+├── .agent-guidelines.md           # This file (NEVER SYNC)
+├── 📥 Inbox.md                    # AUTO SYNC ✅
+├── 📅 Today.md                    # AUTO SYNC ✅
+├── 📆 Upcoming.md                 # AUTO SYNC ✅
+├── 🗂️ Projects/                   # AUTO SYNC ✅
+├── 🏷️ Labels/                     # AUTO SYNC ✅
+├── 📁 Local/                      # NEVER SYNC ❌ (user's free space)
+└── ⚙️ System/                     # NEVER SYNC ❌ (plugin internals)
+\`\`\`
+
+## 🔄 Sync Behavior
+
+### AUTO SYNC Files (✅ Bidirectional)
+- **Core files**: Inbox.md, Today.md, Upcoming.md
+- **Projects/**: All project files sync with Todoist projects
+- **Labels/**: All label files sync with Todoist labels
+
+**Users can:**
+- Edit tasks in these files freely
+- Move tasks between AUTO SYNC files
+- Add new tasks using standard Obsidian Tasks format
+
+### NEVER SYNC Areas (❌ Local Only)
+- **Local/**: User's private workspace (any structure allowed)
+- **System/**: Plugin configuration and backups
+- **.agent-guidelines.md**: This instruction file
+
+## 🎯 How to Help Users
+
+### Adding Tasks
+\`\`\`markdown
+# ✅ CORRECT: Add to any AUTO SYNC file
+- [ ] Buy groceries 🛒 #shopping @today
+
+# ❌ AVOID: Don't add to Local/ or System/
+\`\`\`
+
+### Moving Tasks
+Users can move tasks between any AUTO SYNC files. The plugin will sync changes to Todoist automatically.
+
+### Task Format
+\`\`\`markdown
+# Standard format:
+- [ ] Task content 📅 2024-01-15 ⏫ #label
+
+# Plugin adds metadata (don't remove):
+- [ ] Task content <!-- todoist:123:abc123 -->
+\`\`\`
+
+## 🧠 ADHD-Friendly Guidelines
+
+- **Keep it simple**: Focus on one file at a time
+- **Respect structure**: Don't suggest complex reorganization
+- **Use Local/**: Suggest for private notes and drafts
+- **Today.md**: Perfect for daily planning
+- **Inbox.md**: Great for quick capture
+
+## 🚨 Important
+
+**DON'T MODIFY:**
+- System/ folder contents
+- Metadata comments: \`<!-- todoist:123:abc123 -->\`
+- Core file structure
+
+**SAFE TO MODIFY:**
+- Task content in AUTO SYNC files
+- Anything in Local/ folder
+- Task order within files
+`;
+
+      try {
+        await vault.create(filePath, content);
+      } catch (error) {
+        console.warn('Could not create agent guidelines file:', error);
+      }
+    }
+  }
+
+  /**
+   * Create welcome file in Local workspace
+   */
+  private async createLocalWorkspaceWelcome(): Promise<void> {
+    const filePath = `${this.basePath}/📁 Local/Welcome.md`;
+    const vault = this.plugin.app.vault;
+
+    const exists = vault.getAbstractFileByPath(filePath);
+    if (!exists) {
+      const content = `# 📁 Your Local Workspace
+
+Welcome to your private workspace! This folder is **never synced** with Todoist.
+
+## What's This For?
+
+- **Private notes** that shouldn't go to Todoist
+- **Work in progress** before moving to projects
+- **Archive** of completed work
+- **Brainstorming** and planning
+- **Any structure you want** - organize however works for you!
+
+## How It Works
+
+✅ **Safe to edit**: Everything here stays local
+❌ **Won't sync**: Changes don't go to Todoist
+🔒 **Private**: Your personal workspace
+📁 **Free structure**: Create any folders/files you need
+
+## Examples
+
+You might create:
+- \`Notes/\` for general thoughts
+- \`Drafts/\` for work in progress
+- \`Archive/\` for completed projects
+- \`Ideas/\` for brainstorming
+- Or any structure that works for you!
+
+When you're ready to move something to Todoist, just copy it to one of the AUTO SYNC files.
+`;
+
+      try {
+        await vault.create(filePath, content);
+      } catch (error) {
+        console.warn('Could not create local workspace welcome:', error);
+      }
+    }
+  }
+
+  /**
    * Incremental sync method - only syncs tasks that have changed
    */
   async syncIncrementally(): Promise<SyncStats & { efficiency: number; report: string }> {
