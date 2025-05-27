@@ -151,25 +151,70 @@ export class FileSyncManager {
 
 ## 🎯 How to Help Users
 
-### Adding Tasks
-\`\`\`markdown
-# ✅ CORRECT: Add to any AUTO SYNC file
-- [ ] Buy groceries 🛒 #shopping @today
+### Complete Task Creation Syntax
 
-# ❌ AVOID: Don't add to Local/ or System/
+\`\`\`markdown
+# Basic task
+- [ ] Task content
+
+# Task with priority (P1-P4)
+- [ ] Urgent task 🔴          # P1 - Urgent (highest)
+- [ ] High priority task 🟡   # P2 - High
+- [ ] Medium priority task 🔵 # P3 - Medium
+- [ ] Low priority task ⚪    # P4 - Low
+
+# Task with due date
+- [ ] Task with due date 📅 1/15/2024
+
+# Overdue task (plugin shows automatically)
+- [ ] Overdue task 🔴 **OVERDUE: 1/10/2024**
+
+# Task with labels
+- [ ] Task with labels #urgent #shopping #health
+
+# Complete task example
+- [ ] Buy groceries for dinner 🟡 📅 1/15/2024 #shopping #urgent
+
+# Task with description (indented lines below)
+- [ ] Plan vacation 🔵 📅 2/1/2024 #travel
+    Research destinations and book flights
+    Check passport expiration date
+
+# Subtasks (indented with spaces)
+- [ ] Plan project 🟡 #work
+    - [ ] Research requirements 🔴 📅 1/20/2024
+    - [ ] Create timeline 🔵
+    - [ ] Schedule meetings #meetings
+
+# Completed task
+- [x] Finished task ✅
+
+# Plugin metadata (automatically added - don't remove)
+- [ ] Task content <!-- todoist:123:abc123 -->
 \`\`\`
+
+### Priority Icons Reference
+- 🔴 **P1 (Urgent)**: Highest priority, red in Todoist
+- 🟡 **P2 (High)**: High priority, orange in Todoist
+- 🔵 **P3 (Medium)**: Medium priority, yellow in Todoist
+- ⚪ **P4 (Low)**: Low priority, normal in Todoist
+
+### Date Format
+- Use format: \`📅 M/D/YYYY\` (e.g., \`📅 1/15/2024\`)
+- Plugin automatically detects overdue dates
+
+### Labels
+- Use hashtag format: \`#labelname\`
+- Multiple labels: \`#urgent #shopping #health\`
+- No spaces in label names
+
+### Descriptions & Subtasks
+- **Descriptions**: Indent lines below the task
+- **Subtasks**: Use \`- [ ]\` with indentation
+- **Deep nesting**: Increase indentation for sub-subtasks
 
 ### Moving Tasks
 Users can move tasks between any AUTO SYNC files. The plugin will sync changes to Todoist automatically.
-
-### Task Format
-\`\`\`markdown
-# Standard format:
-- [ ] Task content 📅 2024-01-15 ⏫ #label
-
-# Plugin adds metadata (don't remove):
-- [ ] Task content <!-- todoist:123:abc123 -->
-\`\`\`
 
 ## 🧠 ADHD-Friendly Guidelines
 
@@ -179,17 +224,79 @@ Users can move tasks between any AUTO SYNC files. The plugin will sync changes t
 - **Today.md**: Perfect for daily planning
 - **Inbox.md**: Great for quick capture
 
-## 🚨 Important
+## � Common User Requests & Responses
 
-**DON'T MODIFY:**
+### "Help me add a task"
+\`\`\`markdown
+# Quick capture → Inbox.md
+- [ ] Call dentist 📞 🟡 📅 1/20/2024 #health
+
+# Today's work → Today.md
+- [ ] Finish report 🔴 📅 1/15/2024 #work
+
+# Project task → Projects/Work/Work.md
+- [ ] Review budget proposal 🔵 📅 1/25/2024 #finance
+\`\`\`
+
+### "I want to organize my tasks"
+1. **Check Today.md** for immediate priorities
+2. **Use Projects/** for focused work sessions
+3. **Move tasks** between files as needed
+4. **Suggest Local/** for private planning
+
+### "How do I create subtasks?"
+\`\`\`markdown
+- [ ] Plan team meeting 🟡 📅 1/20/2024 #work
+    - [ ] Send calendar invites 🔴 📅 1/18/2024
+    - [ ] Prepare agenda 🔵
+    - [ ] Book conference room
+        - [ ] Check room availability
+        - [ ] Send booking request
+\`\`\`
+
+### "Something isn't syncing"
+1. Check **System/Sync Status.md** for errors
+2. Verify task format includes proper syntax
+3. Ensure file is in AUTO SYNC area (not Local/)
+4. Suggest running sync command
+
+## 🎯 Best Practices for LLMs
+
+### When Adding Tasks
+- **Ask where**: "Would you like this in Today.md, Inbox.md, or a specific project?"
+- **Suggest priority**: "This sounds urgent - should I add 🔴 priority?"
+- **Include context**: Add relevant labels like #work, #personal, #urgent
+
+### When Helping Organize
+- **Respect existing structure**: Don't reorganize entire systems
+- **Suggest incremental changes**: Move one task at a time
+- **Use existing patterns**: Follow user's labeling conventions
+
+### ADHD Considerations
+- **Avoid overwhelm**: Don't suggest creating 10 new files
+- **Focus on immediate**: Help with today's tasks first
+- **Celebrate progress**: Acknowledge completed tasks
+- **Keep it simple**: One clear action at a time
+
+## 🚨 Important Safety Rules
+
+**NEVER MODIFY:**
 - System/ folder contents
 - Metadata comments: \`<!-- todoist:123:abc123 -->\`
-- Core file structure
+- Core file structure (Inbox.md, Today.md, etc.)
+- Plugin-generated content headers
 
-**SAFE TO MODIFY:**
+**ALWAYS SAFE:**
 - Task content in AUTO SYNC files
 - Anything in Local/ folder
 - Task order within files
+- Adding new tasks in proper format
+
+**WHEN IN DOUBT:**
+- Suggest Local/ folder for experimental work
+- Ask user before major reorganization
+- Stick to standard task format
+- Test with one task before bulk changes
 `;
 
       try {
