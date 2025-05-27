@@ -1,6 +1,7 @@
 import type { Duration } from '@/api/domain/task';
 import type { Task } from '@/data/task';
 import { DurationParser } from './DurationParser';
+import { RecurringTaskParser } from './RecurringTaskParser';
 
 /**
  * Handles formatting tasks as markdown with embedded metadata for mapping
@@ -15,6 +16,17 @@ export class TaskFormatter {
     // Add duration if present (NEW: Duration support)
     if (task.duration) {
       line += ` ${DurationParser.formatDuration(task.duration)}`;
+    }
+
+    // Add recurring indicator if present (NEW: Recurring support)
+    if (task.due?.isRecurring) {
+      // Use Todoist's due string directly if it contains recurring pattern
+      if (task.due.string && RecurringTaskParser.isRecurringPattern(task.due.string)) {
+        line += ` ${RecurringTaskParser.formatRecurring(task.due.string)}`;
+      } else {
+        // Fallback to basic recurring indicator
+        line += ` 🔄 recurring`;
+      }
     }
 
     // Add priority indicator
@@ -66,6 +78,7 @@ export class TaskFormatter {
       priority: task.priority,
       due: task.due?.date || null,
       duration: task.duration || null, // NEW: Include duration in hash
+      isRecurring: task.due?.isRecurring || false, // NEW: Include recurring status in hash
       labels: task.labels.map(l => l.name).sort(),
       project: task.project.id,
       section: task.section?.id || null,
@@ -239,14 +252,15 @@ export class TaskFormatter {
    * Parse a markdown task line to extract task content
    */
   static extractTaskContent(markdownLine: string): string | null {
-    // More comprehensive regex to handle all metadata patterns
-    const match = markdownLine.match(/^- \[([ x])\] (.+?)(?:\s+(?:⏱️|🔴|🟡|🔵|⚪|📅|#)|\s*<!--|$)/);
+    // More comprehensive regex to handle all metadata patterns including recurring
+    const match = markdownLine.match(/^- \[([ x])\] (.+?)(?:\s+(?:⏱️|🔄|🔴|🟡|🔵|⚪|📅|#)|\s*<!--|$)/);
     if (!match) return null;
 
     let content = match[2].trim();
 
     // Remove any remaining metadata that might be in the content
     content = DurationParser.removeDuration(content);
+    content = RecurringTaskParser.removeRecurring(content);
     content = content.replace(/\s*(🔴|🟡|🔵|⚪|📅|#\w+)\s*.*$/, '').trim();
 
     return content || null;
@@ -325,6 +339,9 @@ export class TaskFormatter {
     // Extract duration (NEW: Duration support)
     const duration = DurationParser.parseDuration(markdownLine);
 
+    // Extract recurring pattern (NEW: Recurring support)
+    const recurringInfo = RecurringTaskParser.parseRecurring(markdownLine);
+
     // Extract labels
     const labelMatches = markdownLine.match(/#(\w+)/g);
     const labels = labelMatches ? labelMatches.map(l => l.substring(1)) : [];
@@ -338,6 +355,7 @@ export class TaskFormatter {
       priority,
       labels,
       duration, // NEW: Include duration in parsed result
+      recurring: recurringInfo?.todoistPattern || null, // NEW: Include recurring pattern
     };
   }
 
@@ -426,6 +444,7 @@ export interface ParsedTask {
   priority: number | null; // null means "preserve original priority"
   labels: string[];
   duration: Duration | null; // NEW: Duration support
+  recurring: string | null; // NEW: Recurring support - Todoist pattern string
 }
 
 /**

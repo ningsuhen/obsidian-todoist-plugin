@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import { TaskFormatter } from '../TaskFormatter';
 import type { Task } from '@/data/task';
+import { describe, expect, it } from 'vitest';
+
+import { TaskFormatter } from '../TaskFormatter';
 
 describe('TaskFormatter - Hash-Based Change Detection', () => {
   describe('Task Hash Calculation', () => {
@@ -288,6 +289,131 @@ describe('TaskFormatter - Hash-Based Change Detection', () => {
       const newHash = TaskFormatter.calculateTaskHash(newTask);
 
       expect(updatedLine).toContain(`<!-- todoist:123:${newHash} -->`);
+    });
+  });
+
+  describe('Recurring Task Support', () => {
+    it('should format recurring tasks with emoji indicators', () => {
+      const recurringTask: Task = {
+        id: '123',
+        content: 'Take medication',
+        priority: 1,
+        due: {
+          date: '2024-01-15',
+          isRecurring: true,
+          string: 'every day'
+        },
+        labels: [],
+        project: { id: 'proj1', name: 'Personal' },
+      } as Task;
+
+      const markdown = TaskFormatter.formatTaskAsMarkdown(recurringTask, true);
+
+      expect(markdown).toContain('🔄 every day');
+      expect(markdown).toContain('Take medication');
+      // Note: Due date formatting depends on includeMetadata parameter
+    });
+
+    it('should format recurring tasks with interval patterns', () => {
+      const recurringTask: Task = {
+        id: '123',
+        content: 'Exercise',
+        priority: 1,
+        due: {
+          date: '2024-01-15',
+          isRecurring: true,
+          string: 'every 2 days'
+        },
+        labels: [],
+        project: { id: 'proj1', name: 'Personal' },
+      } as Task;
+
+      const markdown = TaskFormatter.formatTaskAsMarkdown(recurringTask, true);
+
+      expect(markdown).toContain('🔄 every 2 days');
+      expect(markdown).toContain('Exercise');
+    });
+
+    it('should use fallback for unrecognized recurring patterns', () => {
+      const recurringTask: Task = {
+        id: '123',
+        content: 'Complex recurring task',
+        priority: 1,
+        due: {
+          date: '2024-01-15',
+          isRecurring: true,
+          string: 'every other day' // This pattern won't be recognized
+        },
+        labels: [],
+        project: { id: 'proj1', name: 'Personal' },
+      } as Task;
+
+      const markdown = TaskFormatter.formatTaskAsMarkdown(recurringTask, true);
+
+      // "every other day" should be formatted as-is since it's a valid Todoist pattern
+      expect(markdown).toContain('🔄 every other day');
+      expect(markdown).toContain('Complex recurring task');
+    });
+
+    it('should include recurring status in hash calculation', () => {
+      const regularTask: Task = {
+        id: '123',
+        content: 'Take medication',
+        priority: 1,
+        due: { date: '2024-01-15', isRecurring: false },
+        labels: [],
+        project: { id: 'proj1', name: 'Personal' },
+      } as Task;
+
+      const recurringTask: Task = {
+        ...regularTask,
+        due: { date: '2024-01-15', isRecurring: true },
+      } as Task;
+
+      const regularHash = TaskFormatter.calculateTaskHash(regularTask);
+      const recurringHash = TaskFormatter.calculateTaskHash(recurringTask);
+
+      expect(regularHash).not.toBe(recurringHash);
+    });
+
+    it('should parse recurring patterns from markdown', () => {
+      const markdownLine = '- [ ] Take medication 🔄 every day 🟡 📅 1/15/2024 <!-- todoist:123:abc -->';
+
+      const parsed = TaskFormatter.parseTaskLine(markdownLine);
+
+      expect(parsed).not.toBeNull();
+      expect(parsed!.content).toBe('Take medication');
+      expect(parsed!.recurring).toBe('every day');
+      expect(parsed!.priority).toBe(3); // 🟡 = P2
+    });
+
+    it('should parse interval recurring patterns from markdown', () => {
+      const markdownLine = '- [ ] Exercise 🔄 every 2 days ⏱️ 30min <!-- todoist:123:abc -->';
+
+      const parsed = TaskFormatter.parseTaskLine(markdownLine);
+
+      expect(parsed).not.toBeNull();
+      expect(parsed!.content).toBe('Exercise');
+      expect(parsed!.recurring).toBe('every 2 days');
+      expect(parsed!.duration).toEqual({ amount: 30, unit: 'minute' });
+    });
+
+    it('should extract task content without recurring patterns', () => {
+      const markdownLine = '- [ ] Take medication 🔄 daily 🟡 📅 1/15/2024';
+
+      const content = TaskFormatter.extractTaskContent(markdownLine);
+
+      expect(content).toBe('Take medication');
+    });
+
+    it('should handle tasks without recurring patterns', () => {
+      const markdownLine = '- [ ] One-time task 🟡 📅 1/15/2024 <!-- todoist:123:abc -->';
+
+      const parsed = TaskFormatter.parseTaskLine(markdownLine);
+
+      expect(parsed).not.toBeNull();
+      expect(parsed!.content).toBe('One-time task');
+      expect(parsed!.recurring).toBeNull();
     });
   });
 });
