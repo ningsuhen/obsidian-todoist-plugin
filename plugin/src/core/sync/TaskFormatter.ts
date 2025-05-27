@@ -269,11 +269,22 @@ export class TaskFormatter {
     const overdueDateMatch = markdownLine.match(/🔴 \*\*OVERDUE: (\d{1,2}\/\d{1,2}\/\d{4})\*\*/);
     const overdueDate = overdueDateMatch ? overdueDateMatch[1] : null;
 
-    // Extract priority
-    let priority = 1;
-    if (markdownLine.includes('🔴')) priority = 4; // P1
-    else if (markdownLine.includes('🟡')) priority = 3; // P2
-    else if (markdownLine.includes('🔵')) priority = 2; // P3
+    // Extract priority (but not from overdue indicators)
+    let priority: number | null = null; // null means "preserve original priority"
+
+    // Check for priority emojis, but exclude overdue dates
+    const hasOverdueDate = markdownLine.includes('🔴 **OVERDUE:');
+
+    if (!hasOverdueDate && markdownLine.includes('🔴')) {
+      priority = 4; // P1 - Only if not an overdue indicator
+    } else if (markdownLine.includes('🟡')) {
+      priority = 3; // P2
+    } else if (markdownLine.includes('🔵')) {
+      priority = 2; // P3
+    } else if (markdownLine.includes('⚪')) {
+      priority = 1; // P4 - Explicitly low priority
+    }
+    // null priority means "no change" - preserve original Todoist priority
 
     // Extract labels
     const labelMatches = markdownLine.match(/#(\w+)/g);
@@ -372,7 +383,7 @@ export interface ParsedTask {
   completed: boolean;
   dueDate: string | null;
   isOverdue: boolean;
-  priority: number;
+  priority: number | null; // null means "preserve original priority"
   labels: string[];
 }
 

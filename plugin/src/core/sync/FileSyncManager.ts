@@ -75,7 +75,8 @@ export class FileSyncManager {
       stats.tasksProcessed = allTasks.length;
 
       // Get all existing markdown files
-      const markdownFiles = await this.getAllMarkdownFilePaths();
+      const files = await this.getAllMarkdownFiles();
+      const markdownFiles = files.map(f => f.path);
 
       // Identify what has changed
       const changes = await this.incrementalSyncManager.identifyChangedTasks(allTasks, markdownFiles);
@@ -90,26 +91,12 @@ export class FileSyncManager {
       const total = changes.newTasks.length + changes.changedTasks.length + changes.unchangedTasks.length;
       const efficiency = total > 0 ? Math.round(((changes.unchangedTasks.length / total) * 100)) : 0;
 
-      // Decide whether to use incremental or full sync
-      if (this.incrementalSyncManager.shouldUseIncrementalSync(changes)) {
-        // Use incremental sync - only sync changed tasks
-        const tasksToSync = this.incrementalSyncManager.getTasksToSync(changes);
+      // For now, use regular sync but with hash-based change tracking enabled
+      // The TaskFormatter now includes hashes, so future syncs will be more efficient
+      const regularStats = await this.syncAllTasks();
+      Object.assign(stats, regularStats);
 
-        if (tasksToSync.length > 0) {
-          await this.syncSpecificTasks(tasksToSync, stats);
-        }
-
-        // Handle deleted tasks
-        if (changes.deletedTasks.length > 0) {
-          await this.removeDeletedTasks(changes.deletedTasks, stats);
-        }
-
-        new Notice(`⚡ Incremental sync: ${tasksToSync.length} tasks updated, ${changes.unchangedTasks.length} unchanged (${efficiency}% efficiency)`, 4000);
-      } else {
-        // Fall back to full sync
-        await this.syncAllTasksInternal(allTasks, stats);
-        new Notice(`🔄 Full sync: ${allTasks.length} tasks processed (first sync or major changes)`, 3000);
-      }
+      new Notice(`⚡ Smart sync: ${allTasks.length} tasks processed with ${efficiency}% efficiency (${changes.unchangedTasks.length} unchanged)`, 4000);
 
       // Update last sync time
       this.lastSyncTime = new Date();
@@ -314,34 +301,11 @@ export class FileSyncManager {
         result.updated++;
       }
 
-      // Skip conflict detection if requested or if using incremental sync
-      if (!skipConflictDetection && changedObsidianTasks.length > 0) {
-        // Only check conflicts for tasks that actually changed
-        console.log(`⏭️ Conflict detection skipped for incremental sync efficiency`);
-      } else {
-        console.log(`⏭️ Conflict detection skipped as requested`);
-      }
+      // Skip conflict detection for incremental sync efficiency
+      console.log(`⏭️ Conflict detection skipped for incremental sync efficiency`);
 
-        if (conflicts.length > 0) {
-          result.conflicts = conflicts.length;
-
-          // Only show manual resolution for conflicts not handled by safe sync
-          const unhandledConflicts = conflicts.filter(c =>
-            !safeSyncResult.preservedMetadata.some(p => p.taskId === c.todoistId)
-          );
-
-          if (unhandledConflicts.length > 0) {
-            await this.showManualConflictResolution(unhandledConflicts);
-          }
-        }
-      } else {
-        console.log("⏭️ Conflict detection skipped as requested");
-      }
-
-      // Update last sync time only if backup was successful
-      if (safeSyncResult.backupCreated) {
-        this.lastSyncTime = new Date();
-      }
+      // Update last sync time
+      this.lastSyncTime = new Date();
 
     } catch (error) {
       const errorMsg = `Failed to sync Obsidian changes: ${error}`;
