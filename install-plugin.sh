@@ -8,7 +8,7 @@ echo "=========================================="
 echo ""
 
 # Use the specific vault path for ningsuhen's setup
-VAULT_PATH="/Users/ningsuhen/Obsidian/vimwiki"
+VAULT_PATH="/Users/ningsuhen/Obsidian-Local/vimwiki"
 
 echo "🔍 Using vault: $VAULT_PATH"
 

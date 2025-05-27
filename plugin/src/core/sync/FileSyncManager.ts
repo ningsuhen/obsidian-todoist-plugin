@@ -166,14 +166,25 @@ export class FileSyncManager {
 # Task with due date
 - [ ] Task with due date 📅 1/15/2024
 
+# 🔄 NEW: Recurring tasks (ADHD-friendly with visual indicators)
+- [ ] Take medication 🔄 every day 🟡 📅 1/15/2024
+- [ ] Weekly review 🔄 every saturday 🔵
+- [ ] Exercise 🔄 every 2 days ⏱️ 30min
+- [ ] Monthly budget 🔄 every month 🔴
+
+# ⏱️ NEW: Duration tracking (time estimates)
+- [ ] Deep work session ⏱️ 2h 🔴 📅 1/20/2024
+- [ ] Quick call ⏱️ 15min 🟡
+- [ ] Exercise routine ⏱️ 45min 🔵
+
 # Overdue task (plugin shows automatically)
 - [ ] Overdue task 🔴 **OVERDUE: 1/10/2024**
 
 # Task with labels
 - [ ] Task with labels #urgent #shopping #health
 
-# Complete task example
-- [ ] Buy groceries for dinner 🟡 📅 1/15/2024 #shopping #urgent
+# Complete task example with ALL features
+- [ ] Take morning medication 🔄 every day 🔴 📅 1/15/2024 ⏱️ 5min #health #routine
 
 # Task with description (indented lines below)
 - [ ] Plan vacation 🔵 📅 2/1/2024 #travel
@@ -182,9 +193,9 @@ export class FileSyncManager {
 
 # Subtasks (indented with spaces)
 - [ ] Plan project 🟡 #work
-    - [ ] Research requirements 🔴 📅 1/20/2024
-    - [ ] Create timeline 🔵
-    - [ ] Schedule meetings #meetings
+    - [ ] Research requirements 🔴 📅 1/20/2024 ⏱️ 1h
+    - [ ] Create timeline 🔵 ⏱️ 30min
+    - [ ] Schedule meetings #meetings ⏱️ 15min
 
 # Completed task
 - [x] Finished task ✅
@@ -198,6 +209,33 @@ export class FileSyncManager {
 - 🟡 **P2 (High)**: High priority, orange in Todoist
 - 🔵 **P3 (Medium)**: Medium priority, yellow in Todoist
 - ⚪ **P4 (Low)**: Low priority, normal in Todoist
+
+### 🔄 NEW: Recurring Tasks (ADHD-Optimized)
+**Visual Indicator**: 🔄 emoji for immediate recognition
+
+**Supported Patterns** (uses Todoist's native patterns):
+- \`🔄 every day\` - Daily recurring
+- \`🔄 every monday\` - Weekly on specific day
+- \`🔄 every week\` - Weekly recurring
+- \`🔄 every 2 days\` - Every N days
+- \`🔄 every 3 weeks\` - Every N weeks
+- \`🔄 every month\` - Monthly recurring
+- \`🔄 every year\` - Yearly recurring
+
+**Smart Suggestions** (AI assistants can suggest based on content):
+- "medication", "pills", "routine" → \`every day\`
+- "weekly", "review", "planning" → \`every week\`
+- "monthly", "budget", "bills" → \`every month\`
+
+### ⏱️ NEW: Duration Tracking (Time Estimates)
+**Visual Indicator**: ⏱️ emoji for time awareness
+
+**Supported Formats**:
+- \`⏱️ 30min\` - Minutes
+- \`⏱️ 2h\` - Hours
+- \`⏱️ 1h 30min\` - Combined hours and minutes
+
+**ADHD Benefits**: Helps with time awareness and planning
 
 ### Date Format
 - Use format: \`📅 M/D/YYYY\` (e.g., \`📅 1/15/2024\`)
@@ -229,13 +267,17 @@ Users can move tasks between any AUTO SYNC files. The plugin will sync changes t
 ### "Help me add a task"
 \`\`\`markdown
 # Quick capture → Inbox.md
-- [ ] Call dentist 📞 🟡 📅 1/20/2024 #health
+- [ ] Call dentist 📞 🟡 📅 1/20/2024 ⏱️ 15min #health
 
 # Today's work → Today.md
-- [ ] Finish report 🔴 📅 1/15/2024 #work
+- [ ] Finish report 🔴 📅 1/15/2024 ⏱️ 2h #work
 
 # Project task → Projects/Work/Work.md
-- [ ] Review budget proposal 🔵 📅 1/25/2024 #finance
+- [ ] Review budget proposal 🔵 📅 1/25/2024 ⏱️ 45min #finance
+
+# NEW: Recurring tasks
+- [ ] Take vitamins 🔄 every day 🟡 ⏱️ 2min #health #routine
+- [ ] Weekly team standup 🔄 every monday 🔵 ⏱️ 30min #work #meetings
 \`\`\`
 
 ### "I want to organize my tasks"
@@ -243,15 +285,31 @@ Users can move tasks between any AUTO SYNC files. The plugin will sync changes t
 2. **Use Projects/** for focused work sessions
 3. **Move tasks** between files as needed
 4. **Suggest Local/** for private planning
+5. **NEW: Use recurring tasks** for routines and habits
 
 ### "How do I create subtasks?"
 \`\`\`markdown
-- [ ] Plan team meeting 🟡 📅 1/20/2024 #work
-    - [ ] Send calendar invites 🔴 📅 1/18/2024
-    - [ ] Prepare agenda 🔵
-    - [ ] Book conference room
-        - [ ] Check room availability
-        - [ ] Send booking request
+- [ ] Plan team meeting 🟡 📅 1/20/2024 ⏱️ 1h #work
+    - [ ] Send calendar invites 🔴 📅 1/18/2024 ⏱️ 10min
+    - [ ] Prepare agenda 🔵 ⏱️ 20min
+    - [ ] Book conference room ⏱️ 5min
+        - [ ] Check room availability ⏱️ 2min
+        - [ ] Send booking request ⏱️ 3min
+\`\`\`
+
+### "How do I set up recurring tasks?"
+\`\`\`markdown
+# Daily routines
+- [ ] Morning meditation 🔄 every day 🔵 ⏱️ 10min #wellness #routine
+- [ ] Take medication 🔄 every day 🔴 ⏱️ 2min #health
+
+# Weekly tasks
+- [ ] Grocery shopping 🔄 every saturday 🟡 ⏱️ 1h #errands
+- [ ] Weekly review 🔄 every sunday 🔵 ⏱️ 30min #planning
+
+# Monthly tasks
+- [ ] Pay rent 🔄 every month 🔴 📅 1/1/2024 ⏱️ 5min #bills
+- [ ] Budget review 🔄 every month 🟡 ⏱️ 45min #finance
 \`\`\`
 
 ### "Something isn't syncing"
