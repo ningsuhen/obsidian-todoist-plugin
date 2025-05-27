@@ -1,17 +1,17 @@
-import { Notice, TFile, TFolder } from 'obsidian';
-import type TodoistPlugin from '@/index';
-import type { Task } from '@/data/task';
-import { TaskMappingManager } from './TaskMappingManager';
-import { TaskFormatter, TaskCollectionUtils } from './TaskFormatter';
-import { buildTaskTree, type TaskTree } from '@/data/transformations/relationships';
-import { ConflictResolver, type TaskConflict } from './ConflictResolver';
-import { ConflictResolutionModal } from '@/ui/conflictModal/ConflictResolutionModal';
-import { SafeSyncStrategy } from './SafeSyncStrategy';
-import { TodoistBackupManager } from '../backup/TodoistBackupManager';
-import { IncrementalSyncManager } from './IncrementalSyncManager';
+import type { Label } from '@/api/domain/label';
 import type { Project } from '@/api/domain/project';
 import type { Section } from '@/api/domain/section';
-import type { Label } from '@/api/domain/label';
+import type { Task } from '@/data/task';
+import { type TaskTree, buildTaskTree } from '@/data/transformations/relationships';
+import type TodoistPlugin from '@/index';
+import { ConflictResolutionModal } from '@/ui/conflictModal/ConflictResolutionModal';
+import { Notice, TFile, TFolder } from 'obsidian';
+import { TodoistBackupManager } from '../backup/TodoistBackupManager';
+import { ConflictResolver, type TaskConflict } from './ConflictResolver';
+import { IncrementalSyncManager } from './IncrementalSyncManager';
+import { SafeSyncStrategy } from './SafeSyncStrategy';
+import { TaskCollectionUtils, TaskFormatter } from './TaskFormatter';
+import { TaskMappingManager } from './TaskMappingManager';
 
 export interface SyncStats {
   tasksProcessed: number;
@@ -64,8 +64,8 @@ export class FileSyncManager {
       return false;
     }
 
-    // Never sync .agent-guidelines.md (LLM instructions)
-    if (relativePath === '.agent-guidelines.md') {
+    // Never sync TODOIST-SPEC.md (LLM instructions)
+    if (relativePath === 'TODOIST-SPEC.md') {
       return false;
     }
 
@@ -98,23 +98,23 @@ export class FileSyncManager {
       }
     }
 
-    // Create agent guidelines file
-    await this.createAgentGuidelinesFile();
+    // Create Todoist specification file
+    await this.createTodoistSpecFile();
 
     // Create user workspace welcome file
     await this.createLocalWorkspaceWelcome();
   }
 
   /**
-   * Create the agent guidelines file in the integration directory
+   * Create the Todoist specification file in the integration directory
    */
-  private async createAgentGuidelinesFile(): Promise<void> {
-    const filePath = `${this.basePath}/.agent-guidelines.md`;
+  private async createTodoistSpecFile(): Promise<void> {
+    const filePath = `${this.basePath}/TODOIST-SPEC.md`;
     const vault = this.plugin.app.vault;
 
     const exists = vault.getAbstractFileByPath(filePath);
     if (!exists) {
-      const content = `# 🤖 Agent Guidelines: Todoist Integration Directory
+      const content = `# 🤖 Todoist Integration Specification
 
 **FOR AI ASSISTANTS:** This file explains how to help users work with the ADHD-Optimized Todoist Plugin.
 
@@ -122,7 +122,7 @@ export class FileSyncManager {
 
 \`\`\`
 📋 01-PRODUCTIVITY/todoist-integration/
-├── .agent-guidelines.md           # This file (NEVER SYNC)
+├── TODOIST-SPEC.md               # This file (NEVER SYNC)
 ├── 📥 Inbox.md                    # AUTO SYNC ✅
 ├── 📅 Today.md                    # AUTO SYNC ✅
 ├── 📆 Upcoming.md                 # AUTO SYNC ✅
@@ -302,7 +302,7 @@ Users can move tasks between any AUTO SYNC files. The plugin will sync changes t
       try {
         await vault.create(filePath, content);
       } catch (error) {
-        console.warn('Could not create agent guidelines file:', error);
+        console.warn('Could not create Todoist specification file:', error);
       }
     }
   }
@@ -564,7 +564,7 @@ When you're ready to move something to Todoist, just copy it to one of the AUTO 
       // Get current Todoist tasks for backup and comparison
       const todoistTasks = await this.fetchAllTasks();
 
-      // Get all markdown files for change detection
+      // Get all markdown files for change detection (only AUTO SYNC files)
       const files = await this.getAllMarkdownFiles();
       const markdownFilePaths = files.map(f => f.path);
 
@@ -677,7 +677,7 @@ When you're ready to move something to Todoist, just copy it to one of the AUTO 
   }
 
   /**
-   * Get all markdown files in the integration folder
+   * Get all markdown files in the integration folder that should be synced
    */
   private async getAllMarkdownFiles(): Promise<TFile[]> {
     const files: TFile[] = [];
@@ -687,8 +687,8 @@ When you're ready to move something to Todoist, just copy it to one of the AUTO 
       const traverse = (currentFolder: TFolder) => {
         for (const child of currentFolder.children) {
           if (child instanceof TFile && child.extension === 'md') {
-            // Skip system files
-            if (!child.path.includes('⚙️ System/')) {
+            // Use shouldSyncFile to determine if this file should be included
+            if (this.shouldSyncFile(child.path)) {
               files.push(child);
             }
           } else if (child instanceof TFolder) {

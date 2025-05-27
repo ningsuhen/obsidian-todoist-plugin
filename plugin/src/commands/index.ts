@@ -3,12 +3,12 @@ import {
   addTaskWithPageInContent,
   addTaskWithPageInDescription,
 } from "@/commands/addTask";
+import { FileSyncManager } from "@/core/sync/FileSyncManager";
 import { t } from "@/i18n";
 import type { Translations } from "@/i18n/translation";
 import type TodoistPlugin from "@/index";
 import debug from "@/log";
 import type { Command as ObsidianCommand } from "obsidian";
-import { FileSyncManager } from "@/core/sync/FileSyncManager";
 import { Notice } from "obsidian";
 
 export type MakeCommand = (
@@ -34,6 +34,10 @@ const fileSyncCommand: MakeCommand = (plugin: TodoistPlugin, i18n: Translations[
       try {
         // Use static import to ensure proper bundling
         const fileSyncManager = new FileSyncManager(plugin);
+
+        // Ensure directory structure exists before syncing
+        await fileSyncManager.initializeDirectoryStructure();
+
         await fileSyncManager.syncAllTasks();
       } catch (error) {
         console.error("File sync failed:", error);
@@ -51,6 +55,10 @@ const bidirectionalSyncCommand: MakeCommand = (plugin: TodoistPlugin, i18n: Tran
       debug("Starting safe bidirectional sync with backup and metadata preservation");
       try {
         const fileSyncManager = new FileSyncManager(plugin);
+
+        // Ensure directory structure exists before syncing
+        await fileSyncManager.initializeDirectoryStructure();
+
         const result = await fileSyncManager.syncObsidianChangesToTodoist();
 
         // Create ADHD-friendly success message with backup info
@@ -101,6 +109,10 @@ const quickSyncCommand: MakeCommand = (plugin: TodoistPlugin, i18n: Translations
       debug("Starting quick sync without conflict detection");
       try {
         const fileSyncManager = new FileSyncManager(plugin);
+
+        // Ensure directory structure exists before syncing
+        await fileSyncManager.initializeDirectoryStructure();
+
         const result = await fileSyncManager.syncObsidianChangesToTodoist(true); // Skip conflicts
 
         // Create simple success message
@@ -141,6 +153,9 @@ const incrementalSyncCommand: MakeCommand = (plugin: TodoistPlugin, i18n: Transl
       debug("Starting smart incremental sync");
       try {
         const fileSyncManager = new FileSyncManager(plugin);
+
+        // Ensure directory structure exists before syncing
+        await fileSyncManager.initializeDirectoryStructure();
 
         // For now, use the regular sync but with hash-based change detection
         // The TaskFormatter now includes hashes, so future syncs will be incremental

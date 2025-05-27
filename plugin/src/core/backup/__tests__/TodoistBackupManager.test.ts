@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { TodoistBackupManager } from '../TodoistBackupManager';
 import type TodoistPlugin from '@/index';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { TodoistBackupManager } from '../TodoistBackupManager';
 
 // Mock the plugin and its dependencies
 const mockPlugin = {
@@ -16,6 +16,8 @@ const mockPlugin = {
   },
   services: {
     todoist: {
+      isReady: vi.fn(() => true),
+      subscribe: vi.fn(() => []),
       data: vi.fn(() => ({
         tasks: {
           iter: vi.fn(),
@@ -62,7 +64,7 @@ describe('TodoistBackupManager', () => {
         { id: 'label1', name: 'urgent', color: 'red' },
       ];
 
-      // Mock data fetching
+      // Mock data fetching - iter() should return iterables
       mockPlugin.services.todoist.data().tasks.iter.mockReturnValue(mockTasks);
       mockPlugin.services.todoist.data().projects.iter.mockReturnValue(mockProjects);
       mockPlugin.services.todoist.data().sections.iter.mockReturnValue(mockSections);
@@ -124,10 +126,10 @@ describe('TodoistBackupManager', () => {
   describe('Backup File Management', () => {
     it('should generate unique backup filenames', async () => {
       const filename1 = (backupManager as any).generateBackupFilename();
-      
+
       // Wait a bit to ensure different timestamp
       await new Promise(resolve => setTimeout(resolve, 1));
-      
+
       const filename2 = (backupManager as any).generateBackupFilename();
 
       expect(filename1).not.toBe(filename2);
@@ -246,7 +248,10 @@ describe('TodoistBackupManager', () => {
       // Mock file deletion
       const mockDelete = vi.fn().mockResolvedValue(undefined);
       mockPlugin.app.vault.delete = mockDelete;
-      mockPlugin.app.vault.getAbstractFileByPath.mockImplementation((path: string) => ({ path }));
+      mockPlugin.app.vault.getAbstractFileByPath.mockImplementation((path: string) => ({
+        path,
+        stat: { size: 1024 }
+      }));
 
       const deletedCount = await backupManager.cleanupOldBackups(7); // Keep 7 days
 

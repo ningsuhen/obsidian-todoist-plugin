@@ -1,6 +1,6 @@
-import { Notice, TFile } from 'obsidian';
-import type TodoistPlugin from '@/index';
 import type { Task } from '@/data/task';
+import type TodoistPlugin from '@/index';
+import { Notice, TFile } from 'obsidian';
 
 /**
  * Comprehensive backup system for Todoist data
@@ -19,9 +19,7 @@ export class TodoistBackupManager {
    */
   async createPreSyncBackup(): Promise<{ success: boolean; backupFile: string; error?: string }> {
     try {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const backupFileName = `todoist-backup-${timestamp}.json`;
-      const backupFilePath = `${this.backupPath}/${backupFileName}`;
+      const backupFilePath = this.generateBackupFilename();
 
       // Fetch all current Todoist data
       const backupData = await this.gatherTodoistData();
@@ -30,10 +28,11 @@ export class TodoistBackupManager {
       await this.ensureBackupDirectory();
       await this.plugin.app.vault.create(backupFilePath, JSON.stringify(backupData, null, 2));
 
-      // Clean up old backups (keep last 10)
-      await this.cleanupOldBackups();
+      // Clean up old backups (keep last 7 days)
+      await this.cleanupOldBackups(7);
 
-      new Notice(`🛡️ Backup created: ${backupFileName}`, 2000);
+      const fileName = backupFilePath.split('/').pop() || 'backup.json';
+      new Notice(`🛡️ Backup created: ${fileName}`, 2000);
 
       return { success: true, backupFile: backupFilePath };
     } catch (error) {
@@ -55,19 +54,16 @@ export class TodoistBackupManager {
     ]);
 
     return {
-      timestamp: new Date().toISOString(),
-      version: '1.0',
+      metadata: {
+        version: '3.0.0',
+        timestamp: new Date().toISOString(),
+        type: 'pre-sync-backup'
+      },
       data: {
         tasks: tasks.map(task => this.preserveTaskMetadata(task)),
         projects,
         sections,
         labels
-      },
-      metadata: {
-        totalTasks: tasks.length,
-        totalProjects: projects.length,
-        backupReason: 'pre-sync-safety',
-        pluginVersion: '3.0.0'
       }
     };
   }
@@ -238,33 +234,157 @@ export class TodoistBackupManager {
   }
 
   /**
-   * Clean up old backups (keep last 10)
+   * Clean up old backups (keep specified number of days)
    */
-  private async cleanupOldBackups(): Promise<void> {
+  async cleanupOldBackups(keepDays: number = 7): Promise<number> {
     try {
       const vault = this.plugin.app.vault;
-      const backupDir = vault.getAbstractFileByPath(this.backupPath);
+      const cutoffTime = Date.now() - (keepDays * 24 * 60 * 60 * 1000);
 
-      if (!backupDir || !(backupDir instanceof TFile)) {
-        return;
+      const backupFiles = await this.listBackupFiles();
+      let deletedCount = 0;
+
+      for (const backupPath of backupFiles) {
+        // Extract timestamp from filename
+        const match = backupPath.match(/backup-(\d+)\.json$/);
+        if (match) {
+          const timestamp = parseInt(match[1]);
+          if (timestamp < cutoffTime) {
+            const file = vault.getAbstractFileByPath(backupPath);
+            if (file) {
+              await vault.delete(file);
+              deletedCount++;
+            }
+          }
+        }
       }
 
-      const backupFiles = vault.getFiles()
-        .filter(file => file.path.startsWith(this.backupPath) && file.name.startsWith('todoist-backup-'))
-        .sort((a, b) => b.stat.mtime - a.stat.mtime); // Sort by modification time, newest first
-
-      // Keep only the 10 most recent backups
-      const filesToDelete = backupFiles.slice(10);
-
-      for (const file of filesToDelete) {
-        await vault.delete(file);
+      if (deletedCount > 0) {
+        console.log(`Cleaned up ${deletedCount} old backup files`);
       }
 
-      if (filesToDelete.length > 0) {
-        console.log(`Cleaned up ${filesToDelete.length} old backup files`);
-      }
+      return deletedCount;
     } catch (error) {
       console.warn('Failed to cleanup old backups:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Generate unique backup filename with timestamp
+   */
+  private generateBackupFilename(): string {
+    const timestamp = Date.now();
+    return `📋 01-PRODUCTIVITY/todoist-integration/⚙️ System/backup-${timestamp}.json`;
+  }
+
+  /**
+   * List all backup files in the system directory
+   */
+  async listBackupFiles(): Promise<string[]> {
+    try {
+      const vault = this.plugin.app.vault;
+      const systemPath = '📋 01-PRODUCTIVITY/todoist-integration/⚙️ System';
+
+      const listing = await vault.adapter.list(systemPath);
+
+      return listing.files
+        .filter(filePath => filePath.includes('backup-') && filePath.endsWith('.json'))
+        .sort(); // Sort chronologically
+    } catch (error) {
+      console.warn('Failed to list backup files:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Validate backup file structure and content
+   */
+  async validateBackup(backupFilePath: string): Promise<boolean> {
+    try {
+      const vault = this.plugin.app.vault;
+      const backupFile = vault.getAbstractFileByPath(backupFilePath);
+
+      if (!backupFile) {
+        return false;
+      }
+
+      const content = await vault.read(backupFile);
+      const backupData = JSON.parse(content);
+
+      // Check required structure
+      if (!backupData.metadata || !backupData.data) {
+        return false;
+      }
+
+      // Check metadata fields
+      if (!backupData.metadata.version || !backupData.metadata.timestamp || !backupData.metadata.type) {
+        return false;
+      }
+
+      // Check data fields
+      if (!Array.isArray(backupData.data.tasks) ||
+          !Array.isArray(backupData.data.projects) ||
+          !Array.isArray(backupData.data.sections) ||
+          !Array.isArray(backupData.data.labels)) {
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.warn('Failed to validate backup:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get backup statistics and information
+   */
+  async getBackupStatistics(): Promise<{
+    totalBackups: number;
+    oldestBackup: string;
+    newestBackup: string;
+    totalSizeBytes: number;
+  }> {
+    try {
+      const backupFiles = await this.listBackupFiles();
+
+      if (backupFiles.length === 0) {
+        return {
+          totalBackups: 0,
+          oldestBackup: '',
+          newestBackup: '',
+          totalSizeBytes: 0
+        };
+      }
+
+      // Sort by filename (which contains timestamp)
+      const sortedFiles = backupFiles.sort();
+
+      let totalSize = 0;
+      const vault = this.plugin.app.vault;
+
+      for (const filePath of backupFiles) {
+        const file = vault.getAbstractFileByPath(filePath);
+        if (file) {
+          totalSize += file.stat.size;
+        }
+      }
+
+      return {
+        totalBackups: backupFiles.length,
+        oldestBackup: sortedFiles[0],
+        newestBackup: sortedFiles[sortedFiles.length - 1],
+        totalSizeBytes: totalSize
+      };
+    } catch (error) {
+      console.warn('Failed to get backup statistics:', error);
+      return {
+        totalBackups: 0,
+        oldestBackup: '',
+        newestBackup: '',
+        totalSizeBytes: 0
+      };
     }
   }
 

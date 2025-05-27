@@ -1,8 +1,8 @@
-import { Notice, TFolder } from 'obsidian';
-import type TodoistPlugin from '@/index';
 import { TodoistApiClient } from '@/api';
 import { ObsidianFetcher } from '@/api/fetcher';
 import { FileSyncManager } from '@/core/sync/FileSyncManager';
+import type TodoistPlugin from '@/index';
+import { Notice, TFolder } from 'obsidian';
 
 export interface SetupProgress {
   currentStep: SetupStep;
@@ -37,7 +37,8 @@ export enum SetupStep {
   DEFAULTS_APPLICATION = 'defaults_application',
   MIGRATION_SCAN = 'migration_scan',
   MIGRATION_EXECUTION = 'migration_execution',
-  SYNC_INITIALIZATION = 'sync_initialization'
+  SYNC_INITIALIZATION = 'sync_initialization',
+  INITIAL_FILE_SYNC = 'initial_file_sync'
 }
 
 interface ConfigurationSummary {
@@ -74,7 +75,7 @@ export class SetupOrchestrator {
   private currentProgress: SetupProgress = {
     currentStep: SetupStep.TOKEN_VALIDATION,
     completedSteps: [],
-    totalSteps: 6,
+    totalSteps: 7,
     progressPercentage: 0,
     estimatedTimeRemaining: 120, // 2 minutes max
     currentOperation: 'Initializing setup...'
@@ -130,17 +131,20 @@ export class SetupOrchestrator {
         await this.executeStep(SetupStep.MIGRATION_EXECUTION, async () => {
           await this.executeMigration();
         });
+      } else {
+        // If no migration is needed, reduce total steps count
+        this.currentProgress.totalSteps = 6;
       }
 
-      // Step 6: Initialize Sync Engine (90% progress)
+      // Step 6: Initialize Sync Engine (85% progress)
       await this.executeStep(SetupStep.SYNC_INITIALIZATION, async () => {
         await this.initializeSyncEngine(apiToken);
       });
 
       // Step 7: Initial File Sync (100% progress)
-      this.currentProgress.currentOperation = 'Creating your Todoist-like files...';
-      this.notifyProgress();
-      await this.performInitialFileSync();
+      await this.executeStep(SetupStep.INITIAL_FILE_SYNC, async () => {
+        await this.performInitialFileSync();
+      });
 
       result.success = true;
       result.stepsCompleted = this.currentProgress.completedSteps.length;
@@ -269,7 +273,8 @@ export class SetupOrchestrator {
       // New Todoist-like structure
       '🗂️ Projects',
       '🏷️ Labels',
-      '⚙️ System'
+      '⚙️ System',
+      '📁 Local'
     ];
 
     for (const folderName of folderStructure) {
@@ -283,6 +288,10 @@ export class SetupOrchestrator {
 
     // Create main Todoist-like files
     await this.createTodoistFiles(basePath);
+
+    // Create agent guidelines and local workspace files
+    await this.createAgentGuidelinesFile(basePath);
+    await this.createLocalWorkspaceWelcome(basePath);
   }
 
   private async createTodoistFiles(basePath: string): Promise<void> {
@@ -432,6 +441,9 @@ export class SetupOrchestrator {
       // Use static import to ensure proper bundling
       const fileSyncManager = new FileSyncManager(this.plugin);
 
+      // Initialize the directory structure that FileSyncManager expects
+      await fileSyncManager.initializeDirectoryStructure();
+
       // Wait a moment for the Todoist service to be fully ready
       await new Promise(resolve => setTimeout(resolve, 1000));
 
@@ -450,7 +462,8 @@ export class SetupOrchestrator {
       [SetupStep.DEFAULTS_APPLICATION]: 'Applying ADHD-optimized settings...',
       [SetupStep.MIGRATION_SCAN]: 'Scanning for existing tasks to import...',
       [SetupStep.MIGRATION_EXECUTION]: 'Importing your existing tasks...',
-      [SetupStep.SYNC_INITIALIZATION]: 'Starting your sync engine...'
+      [SetupStep.SYNC_INITIALIZATION]: 'Starting your sync engine...',
+      [SetupStep.INITIAL_FILE_SYNC]: 'Creating your Todoist-like files...'
     };
     return descriptions[step];
   }
@@ -478,5 +491,148 @@ export class SetupOrchestrator {
 
   private notifyError(error: SetupError): void {
     this.errorCallbacks.forEach(callback => callback(error));
+  }
+
+  /**
+   * Create the agent guidelines file in the integration directory
+   */
+  private async createAgentGuidelinesFile(basePath: string): Promise<void> {
+    const filePath = `${basePath}/.agent-guidelines.md`;
+    const vault = this.plugin.app.vault;
+
+    const exists = vault.getAbstractFileByPath(filePath);
+    if (!exists) {
+      const content = `# 🤖 Agent Guidelines: Todoist Integration Directory
+
+**FOR AI ASSISTANTS:** This file explains how to help users work with the ADHD-Optimized Todoist Plugin.
+
+## 📁 Directory Structure & Sync Rules
+
+\`\`\`
+📋 01-PRODUCTIVITY/todoist-integration/
+├── .agent-guidelines.md           # This file (NEVER SYNC)
+├── 📥 Inbox.md                    # AUTO SYNC ✅
+├── 📅 Today.md                    # AUTO SYNC ✅
+├── 📆 Upcoming.md                 # AUTO SYNC ✅
+├── 🗂️ Projects/                   # AUTO SYNC ✅
+├── 🏷️ Labels/                     # AUTO SYNC ✅
+├── 📁 Local/                      # NEVER SYNC ❌ (user's free space)
+└── ⚙️ System/                     # NEVER SYNC ❌ (plugin internals)
+\`\`\`
+
+## 🔄 Sync Behavior
+
+### AUTO SYNC Files (✅ Bidirectional)
+- **Core files**: Inbox.md, Today.md, Upcoming.md
+- **Projects/**: All project files sync with Todoist projects
+- **Labels/**: All label files sync with Todoist labels
+
+**Users can:**
+- Edit tasks in these files freely
+- Move tasks between AUTO SYNC files
+- Add new tasks using standard Obsidian Tasks format
+
+### NEVER SYNC Areas (❌ Local Only)
+- **Local/**: User's private workspace (any structure allowed)
+- **System/**: Plugin configuration and backups
+- **.agent-guidelines.md**: This instruction file
+
+## 🎯 How to Help Users
+
+### Complete Task Creation Syntax
+
+\`\`\`markdown
+# Basic task
+- [ ] Task content
+
+# With priority (🔴 P1, 🟠 P2, 🔵 P3, ⚪ P4)
+- [ ] 🔴 High priority task
+
+# With due date
+- [ ] Task content 📅 2024-01-15
+
+# With project and labels
+- [ ] Task content #project @label1 @label2
+
+# With subtasks (proper indentation)
+- [ ] Main task
+  - [ ] Subtask 1
+  - [ ] Subtask 2
+    - [ ] Sub-subtask
+
+# With description
+- [ ] Task content
+  Description: Additional details here
+
+# Complete example
+- [ ] 🔴 Review quarterly goals #work @planning @urgent 📅 2024-01-15
+  Description: Prepare for Q1 planning meeting
+  - [ ] Gather metrics from last quarter
+  - [ ] Draft improvement suggestions
+\`\`\`
+
+**WHEN IN DOUBT:**
+- Suggest Local/ folder for experimental work
+- Ask user before major reorganization
+- Stick to standard task format
+- Test with one task before bulk changes
+`;
+
+      try {
+        await vault.create(filePath, content);
+      } catch (error) {
+        console.warn('Could not create agent guidelines file:', error);
+      }
+    }
+  }
+
+  /**
+   * Create welcome file in Local workspace
+   */
+  private async createLocalWorkspaceWelcome(basePath: string): Promise<void> {
+    const filePath = `${basePath}/📁 Local/Welcome.md`;
+    const vault = this.plugin.app.vault;
+
+    const exists = vault.getAbstractFileByPath(filePath);
+    if (!exists) {
+      const content = `# 📁 Your Local Workspace
+
+**This folder is YOURS!** 🎉
+
+## What's Special About Local/
+
+- ❌ **Never syncs** with Todoist (completely private)
+- 🏗️ **Any structure** you want (no rules!)
+- 🧪 **Perfect for experiments** and drafts
+- 📝 **Your personal notes** and planning
+
+## Ideas for This Space
+
+- Draft tasks before moving them to Todoist
+- Personal notes and brainstorming
+- Project planning and mind maps
+- Archive of completed work
+- Anything else you need!
+
+## Moving to Todoist
+
+When you're ready to move something to Todoist, just copy it to one of the AUTO SYNC files.
+`;
+
+      try {
+        await vault.create(filePath, content);
+      } catch (error) {
+        console.warn('Could not create local workspace welcome:', error);
+      }
+    }
+  }
+
+  /**
+   * Alias for startSetup() - this is what tests expect
+   * @param apiToken - Todoist API token
+   * @returns Promise<SetupResult> - Complete setup result
+   */
+  async runSetup(apiToken: string): Promise<SetupResult> {
+    return this.startSetup(apiToken);
   }
 }

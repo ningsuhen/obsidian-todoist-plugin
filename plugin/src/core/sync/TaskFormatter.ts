@@ -209,6 +209,25 @@ export class TaskFormatter {
   }
 
   /**
+   * Update the hash in a markdown line
+   */
+  static updateTaskHash(markdownLine: string, task: Task): string {
+    const newHash = this.calculateTaskHash(task);
+    const metadata = this.extractTodoistMetadata(markdownLine);
+
+    if (metadata) {
+      // Replace existing hash
+      return markdownLine.replace(
+        `<!-- todoist:${metadata.id}:${metadata.hash} -->`,
+        `<!-- todoist:${task.id}:${newHash} -->`
+      );
+    } else {
+      // Add new metadata
+      return `${markdownLine} <!-- todoist:${task.id}:${newHash} -->`;
+    }
+  }
+
+  /**
    * Parse a markdown task line to extract task content
    */
   static extractTaskContent(markdownLine: string): string | null {
