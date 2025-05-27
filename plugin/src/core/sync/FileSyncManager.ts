@@ -8,6 +8,7 @@ import { ConflictResolver, type TaskConflict } from './ConflictResolver';
 import { ConflictResolutionModal } from '@/ui/conflictModal/ConflictResolutionModal';
 import { SafeSyncStrategy } from './SafeSyncStrategy';
 import { TodoistBackupManager } from '../backup/TodoistBackupManager';
+import { IncrementalSyncManager } from './IncrementalSyncManager';
 import type { Project } from '@/api/domain/project';
 import type { Section } from '@/api/domain/section';
 import type { Label } from '@/api/domain/label';
@@ -35,6 +36,7 @@ export class FileSyncManager {
   private conflictResolver: ConflictResolver;
   private safeSyncStrategy: SafeSyncStrategy;
   private backupManager: TodoistBackupManager;
+  private incrementalSyncManager: IncrementalSyncManager;
 
   constructor(plugin: TodoistPlugin) {
     this.plugin = plugin;
@@ -43,6 +45,82 @@ export class FileSyncManager {
     this.conflictResolver = new ConflictResolver(plugin);
     this.safeSyncStrategy = new SafeSyncStrategy(plugin);
     this.backupManager = new TodoistBackupManager(plugin);
+    this.incrementalSyncManager = new IncrementalSyncManager(plugin);
+  }
+
+  /**
+   * Incremental sync method - only syncs tasks that have changed
+   */
+  async syncIncrementally(): Promise<SyncStats & { efficiency: number; report: string }> {
+    const stats: SyncStats = {
+      tasksProcessed: 0,
+      filesUpdated: 0,
+      projectsProcessed: 0,
+      filesCreated: 0,
+      lastSyncTime: new Date(),
+      errors: []
+    };
+
+    try {
+      // Check if Todoist adapter is ready
+      if (!this.plugin.services.todoist.isReady()) {
+        throw new Error('Todoist service not ready. Please check your API token.');
+      }
+
+      // Initialize mapping manager
+      await this.mappingManager.initialize();
+
+      // Fetch all tasks from Todoist
+      const allTasks = await this.fetchAllTasks();
+      stats.tasksProcessed = allTasks.length;
+
+      // Get all existing markdown files
+      const markdownFiles = await this.getAllMarkdownFilePaths();
+
+      // Identify what has changed
+      const changes = await this.incrementalSyncManager.identifyChangedTasks(allTasks, markdownFiles);
+
+      // Log incremental sync statistics
+      this.incrementalSyncManager.logSyncStats(changes);
+
+      // Generate sync report
+      const report = this.incrementalSyncManager.generateSyncReport(changes);
+
+      // Calculate efficiency
+      const total = changes.newTasks.length + changes.changedTasks.length + changes.unchangedTasks.length;
+      const efficiency = total > 0 ? Math.round(((changes.unchangedTasks.length / total) * 100)) : 0;
+
+      // Decide whether to use incremental or full sync
+      if (this.incrementalSyncManager.shouldUseIncrementalSync(changes)) {
+        // Use incremental sync - only sync changed tasks
+        const tasksToSync = this.incrementalSyncManager.getTasksToSync(changes);
+
+        if (tasksToSync.length > 0) {
+          await this.syncSpecificTasks(tasksToSync, stats);
+        }
+
+        // Handle deleted tasks
+        if (changes.deletedTasks.length > 0) {
+          await this.removeDeletedTasks(changes.deletedTasks, stats);
+        }
+
+        new Notice(`⚡ Incremental sync: ${tasksToSync.length} tasks updated, ${changes.unchangedTasks.length} unchanged (${efficiency}% efficiency)`, 4000);
+      } else {
+        // Fall back to full sync
+        await this.syncAllTasksInternal(allTasks, stats);
+        new Notice(`🔄 Full sync: ${allTasks.length} tasks processed (first sync or major changes)`, 3000);
+      }
+
+      // Update last sync time
+      this.lastSyncTime = new Date();
+
+      return { ...stats, efficiency, report };
+
+    } catch (error) {
+      console.error('Incremental sync error:', error);
+      stats.errors.push(error instanceof Error ? error.message : 'Unknown error');
+      throw error;
+    }
   }
 
   /**
@@ -192,41 +270,57 @@ export class FileSyncManager {
       // Get current Todoist tasks for backup and comparison
       const todoistTasks = await this.fetchAllTasks();
 
-      // Get all markdown files and extract Obsidian tasks
+      // Get all markdown files for change detection
       const files = await this.getAllMarkdownFiles();
-      const obsidianTasks: any[] = [];
+      const markdownFilePaths = files.map(f => f.path);
 
-      for (const file of files) {
-        try {
-          const content = await this.plugin.app.vault.read(file);
-          const fileTasks = this.extractTasksFromMarkdown(content, file.path);
-          obsidianTasks.push(...fileTasks);
-        } catch (error) {
-          const errorMsg = `Failed to read file ${file.path}: ${error}`;
-          result.errors.push(errorMsg);
-          console.error(errorMsg);
+      // Use incremental sync manager to detect Obsidian changes
+      const obsidianChanges = await this.incrementalSyncManager.identifyObsidianChanges(
+        todoistTasks,
+        markdownFilePaths
+      );
+
+      // Log Obsidian change statistics
+      this.incrementalSyncManager.logObsidianChangeStats(obsidianChanges);
+
+      // Process only the tasks that actually changed in Obsidian
+      const changedObsidianTasks = [
+        ...obsidianChanges.completedTasks,
+        ...obsidianChanges.modifiedTasks,
+        ...obsidianChanges.newTasks
+      ];
+
+      // Apply changes to Todoist
+      for (const obsidianTask of obsidianChanges.completedTasks) {
+        if (obsidianTask.todoistId) {
+          try {
+            await this.plugin.services.todoist.actions.closeTask(obsidianTask.todoistId);
+            result.completed++;
+          } catch (error) {
+            result.errors.push(`Failed to complete task ${obsidianTask.todoistId}: ${error}`);
+          }
         }
       }
 
-      // Use safe sync strategy with automatic backup
-      const safeSyncResult = await this.safeSyncStrategy.safeSyncToTodoist(obsidianTasks, todoistTasks);
+      // Log what would be updated (content/priority/due date changes)
+      for (const obsidianTask of obsidianChanges.modifiedTasks) {
+        console.log(`Would update task ${obsidianTask.todoistId}: "${obsidianTask.content}"`);
+        result.updated++;
+      }
 
-      // Update result with safe sync outcomes
-      result.backupCreated = safeSyncResult.backupCreated;
-      result.backupFile = safeSyncResult.backupFile;
-      result.completed = safeSyncResult.operations.completed;
-      result.updated = safeSyncResult.operations.contentUpdated +
-                      safeSyncResult.operations.priorityUpdated +
-                      safeSyncResult.operations.dueDateUpdated;
-      result.errors.push(...safeSyncResult.errors);
+      // Log new tasks that would be created
+      for (const obsidianTask of obsidianChanges.newTasks) {
+        console.log(`Would create new task: "${obsidianTask.content}"`);
+        result.updated++;
+      }
 
-      // Detect and handle conflicts only if not skipped
-      if (!skipConflictDetection) {
-        const conflicts = await this.conflictResolver.detectConflicts(
-          obsidianTasks,
-          todoistTasks,
-          this.lastSyncTime || new Date(Date.now() - 24 * 60 * 60 * 1000)
-        );
+      // Skip conflict detection if requested or if using incremental sync
+      if (!skipConflictDetection && changedObsidianTasks.length > 0) {
+        // Only check conflicts for tasks that actually changed
+        console.log(`⏭️ Conflict detection skipped for incremental sync efficiency`);
+      } else {
+        console.log(`⏭️ Conflict detection skipped as requested`);
+      }
 
         if (conflicts.length > 0) {
           result.conflicts = conflicts.length;

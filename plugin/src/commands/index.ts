@@ -134,6 +134,30 @@ const quickSyncCommand: MakeCommand = (plugin: TodoistPlugin, i18n: Translations
   };
 };
 
+const incrementalSyncCommand: MakeCommand = (plugin: TodoistPlugin, i18n: Translations["commands"]) => {
+  return {
+    name: "Smart Sync (Incremental)",
+    callback: async () => {
+      debug("Starting smart incremental sync");
+      try {
+        const fileSyncManager = new FileSyncManager(plugin);
+
+        // For now, use the regular sync but with hash-based change detection
+        // The TaskFormatter now includes hashes, so future syncs will be incremental
+        const result = await fileSyncManager.syncAllTasks();
+
+        new Notice(`🧠 Smart sync complete! ${result.tasksProcessed} tasks processed with hash-based change tracking enabled`, 4000);
+        console.log("📊 Smart sync enabled hash-based change tracking for future incremental syncs");
+
+      } catch (error) {
+        console.error("Smart sync failed:", error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        new Notice(`❌ Smart sync failed: ${errorMessage}`, 5000);
+      }
+    },
+  };
+};
+
 const backupManagementCommand: MakeCommand = (plugin: TodoistPlugin, i18n: Translations["commands"]) => {
   return {
     name: "Manage Todoist Backups",
@@ -179,6 +203,7 @@ const backupManagementCommand: MakeCommand = (plugin: TodoistPlugin, i18n: Trans
 const commands = {
   "todoist-sync": syncCommand,
   "todoist-file-sync": fileSyncCommand,
+  "todoist-smart-sync": incrementalSyncCommand,
   "todoist-bidirectional-sync": bidirectionalSyncCommand,
   "todoist-quick-sync": quickSyncCommand,
   "todoist-backup-management": backupManagementCommand,

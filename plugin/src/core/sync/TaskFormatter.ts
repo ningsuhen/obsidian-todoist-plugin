@@ -5,7 +5,7 @@ import type { Task } from '@/data/task';
  */
 export class TaskFormatter {
   /**
-   * Format a task as markdown checkbox with hidden metadata for mapping
+   * Format a task as markdown checkbox with hidden metadata for mapping and change tracking
    */
   static formatTaskAsMarkdown(task: Task, includeMetadata: boolean = true): string {
     let line = `- [ ] ${task.content}`;
@@ -34,9 +34,10 @@ export class TaskFormatter {
       line += ` ${labelStr}`;
     }
 
-    // Add hidden metadata comment for mapping (if enabled)
+    // Add hidden metadata comment for mapping and change tracking (if enabled)
     if (includeMetadata) {
-      line += ` <!-- todoist:${task.id} -->`;
+      const taskHash = this.calculateTaskHash(task);
+      line += ` <!-- todoist:${task.id}:${taskHash} -->`;
     }
 
     // Add properly formatted description if present
@@ -46,6 +47,32 @@ export class TaskFormatter {
 
     line += '\n';
     return line;
+  }
+
+  /**
+   * Calculate a hash of the task content for change detection
+   */
+  static calculateTaskHash(task: Task): string {
+    const hashData = {
+      content: task.content,
+      description: task.description || '',
+      priority: task.priority,
+      due: task.due?.date || null,
+      labels: task.labels.map(l => l.name).sort(),
+      project: task.project.id,
+      section: task.section?.id || null,
+      order: task.order
+    };
+
+    // Create a simple hash from the JSON string
+    const jsonString = JSON.stringify(hashData);
+    let hash = 0;
+    for (let i = 0; i < jsonString.length; i++) {
+      const char = jsonString.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash).toString(36);
   }
 
   /**
@@ -161,8 +188,24 @@ export class TaskFormatter {
    * Parse a markdown task line to extract Todoist ID from hidden metadata
    */
   static extractTodoistId(markdownLine: string): string | null {
-    const match = markdownLine.match(/<!-- todoist:([^>]+) -->/);
+    const match = markdownLine.match(/<!-- todoist:([^:>]+)(?::[^>]+)? -->/);
     return match ? match[1] : null;
+  }
+
+  /**
+   * Parse a markdown task line to extract Todoist ID and hash from hidden metadata
+   */
+  static extractTodoistMetadata(markdownLine: string): { id: string; hash: string } | null {
+    const match = markdownLine.match(/<!-- todoist:([^:>]+):([^>]+) -->/);
+    return match ? { id: match[1], hash: match[2] } : null;
+  }
+
+  /**
+   * Check if a task has changed by comparing hashes
+   */
+  static hasTaskChanged(todoistTask: Task, obsidianHash: string): boolean {
+    const currentHash = this.calculateTaskHash(todoistTask);
+    return currentHash !== obsidianHash;
   }
 
   /**
