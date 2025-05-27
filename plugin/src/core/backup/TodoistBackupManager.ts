@@ -179,9 +179,9 @@ export class TodoistBackupManager {
       const data = this.plugin.services.todoist.data();
       // Use the correct method to get all projects
       const projects: any[] = [];
-      data.projects.forEach((project: any) => {
+      for (const project of data.projects.iter()) {
         projects.push(project);
-      });
+      }
       return projects;
     } catch (error) {
       console.warn('Failed to fetch projects for backup:', error);
@@ -197,9 +197,9 @@ export class TodoistBackupManager {
       const data = this.plugin.services.todoist.data();
       // Use the correct method to get all sections
       const sections: any[] = [];
-      data.sections.forEach((section: any) => {
+      for (const section of data.sections.iter()) {
         sections.push(section);
-      });
+      }
       return sections;
     } catch (error) {
       console.warn('Failed to fetch sections for backup:', error);
@@ -215,9 +215,9 @@ export class TodoistBackupManager {
       const data = this.plugin.services.todoist.data();
       // Use the correct method to get all labels
       const labels: any[] = [];
-      data.labels.forEach((label: any) => {
+      for (const label of data.labels.iter()) {
         labels.push(label);
-      });
+      }
       return labels;
     } catch (error) {
       console.warn('Failed to fetch labels for backup:', error);
