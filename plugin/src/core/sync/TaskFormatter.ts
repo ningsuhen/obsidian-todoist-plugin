@@ -39,13 +39,122 @@ export class TaskFormatter {
       line += ` <!-- todoist:${task.id} -->`;
     }
 
-    // Add description if present
-    if (task.description) {
-      line += `\n  > ${task.description}`;
+    // Add properly formatted description if present
+    if (task.description && task.description.trim()) {
+      line += '\n' + this.formatDescription(task.description);
     }
 
     line += '\n';
     return line;
+  }
+
+  /**
+   * Format task description with proper indentation and structure
+   */
+  static formatDescription(description: string): string {
+    if (!description || !description.trim()) {
+      return '';
+    }
+
+    const lines = description.split('\n');
+    const formattedLines: string[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      if (!line) {
+        // Empty line - add spacing but maintain indentation
+        formattedLines.push('');
+        continue;
+      }
+
+      // Check if this looks like a header/section (starts with emoji or special chars)
+      if (this.isDescriptionHeader(line)) {
+        // Headers get double indentation for visual separation
+        formattedLines.push(`    **${line}**`);
+      } else if (line.startsWith('Includes:') || line.startsWith('Note:') || line.startsWith('Details:')) {
+        // Sub-descriptions get triple indentation
+        formattedLines.push(`      *${line}*`);
+      } else if (line.startsWith('-') || line.startsWith('•') || line.startsWith('*')) {
+        // List items get standard indentation
+        formattedLines.push(`    ${line}`);
+      } else {
+        // Regular description text gets standard indentation
+        formattedLines.push(`    ${line}`);
+      }
+    }
+
+    return formattedLines.join('\n');
+  }
+
+  /**
+   * Check if a line looks like a description header
+   */
+  static isDescriptionHeader(line: string): boolean {
+    // Check for common header patterns
+    const headerPatterns = [
+      /^[🎵🧘👣🎯📚💡🔧⚡🌟🎨🏃‍♂️🎪🎭🎬🎮🎲🎸🎤🎧🎼🎹🥁🎺🎻]/u, // Starts with emoji
+      /^[A-Z][A-Za-z\s&]+:?\s*$/,  // Title case text possibly ending with colon
+      /^\d+\./,  // Numbered items
+      /^[A-Z]{2,}/,  // ALL CAPS
+    ];
+
+    return headerPatterns.some(pattern => pattern.test(line.trim()));
+  }
+
+  /**
+   * Format subtasks with proper hierarchical indentation
+   */
+  static formatSubtasks(subtasks: Task[], parentIndent: string = ''): string {
+    if (!subtasks || subtasks.length === 0) {
+      return '';
+    }
+
+    let result = '';
+    const indent = parentIndent + '  '; // Add 2 spaces for each level
+
+    for (const subtask of subtasks) {
+      // Format subtask with increased indentation
+      result += `${indent}- [ ] ${subtask.content}`;
+
+      // Add priority for subtasks
+      if (subtask.priority > 1) {
+        result += ` ${this.getPriorityEmoji(subtask.priority)}`;
+      }
+
+      // Add due date for subtasks
+      if (subtask.due) {
+        const dueDate = new Date(subtask.due.date);
+        const isOverdue = dueDate < new Date();
+        const dateStr = dueDate.toLocaleDateString();
+
+        if (isOverdue) {
+          result += ` 🔴 **OVERDUE: ${dateStr}**`;
+        } else {
+          result += ` 📅 ${dateStr}`;
+        }
+      }
+
+      // Add labels for subtasks
+      if (subtask.labels.length > 0) {
+        const labelStr = subtask.labels.map(l => `#${l.name}`).join(' ');
+        result += ` ${labelStr}`;
+      }
+
+      result += ` <!-- todoist:${subtask.id} -->\n`;
+
+      // Add subtask description with deeper indentation
+      if (subtask.description && subtask.description.trim()) {
+        const descriptionLines = subtask.description.split('\n');
+        for (const descLine of descriptionLines) {
+          if (descLine.trim()) {
+            result += `${indent}    ${descLine.trim()}\n`;
+          }
+        }
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -152,7 +261,7 @@ export class TaskFormatter {
 
     const todoistId = preserveMetadata ? this.extractTodoistId(originalLine) : null;
     const completed = this.isTaskCompleted(originalLine);
-    
+
     // Extract existing metadata (priority, due date, labels)
     const dueDateMatch = originalLine.match(/(📅 \d{1,2}\/\d{1,2}\/\d{4})/);
     const overdueMatch = originalLine.match(/(🔴 \*\*OVERDUE: \d{1,2}\/\d{1,2}\/\d{4}\*\*)/);
@@ -243,7 +352,7 @@ export class TaskCollectionUtils {
       if (!parsed || !parsed.todoistId) return;
 
       const original = originalTasks.find(t => t.id === parsed.todoistId);
-      
+
       // Check if content has changed
       if (original && original.content !== parsed.content) {
         modifications.push({ line: index, parsed, original });

@@ -3,6 +3,7 @@ import type TodoistPlugin from '@/index';
 import type { Task } from '@/data/task';
 import { TaskMappingManager } from './TaskMappingManager';
 import { TaskFormatter, TaskCollectionUtils } from './TaskFormatter';
+import { buildTaskTree, type TaskTree } from '@/data/transformations/relationships';
 import type { Project } from '@/api/domain/project';
 import type { Section } from '@/api/domain/section';
 import type { Label } from '@/api/domain/label';
@@ -423,11 +424,12 @@ Great job keeping your inbox clean! 🎉
     } else {
       content += `## Tasks (${tasks.length})\n\n`;
 
-      // Sort by priority and due date
-      const sortedTasks = this.sortTasks(tasks);
+      // Build task tree to handle subtasks properly
+      const taskTrees = buildTaskTree(tasks);
+      const sortedTrees = this.sortTaskTrees(taskTrees);
 
-      for (const task of sortedTasks) {
-        content += this.formatTaskAsMarkdown(task);
+      for (const taskTree of sortedTrees) {
+        content += this.formatTaskTreeAsMarkdown(taskTree);
       }
     }
 
@@ -459,15 +461,16 @@ Enjoy your free day or tackle some upcoming tasks! 🌟
     } else {
       content += `## Tasks (${tasks.length})\n\n`;
 
-      // Group by priority for ADHD focus
-      const priorityGroups = this.groupTasksByPriority(tasks);
+      // Build task tree and group by priority for ADHD focus
+      const taskTrees = buildTaskTree(tasks);
+      const priorityGroups = this.groupTaskTreesByPriority(taskTrees);
 
-      for (const [priority, priorityTasks] of Object.entries(priorityGroups)) {
-        if (priorityTasks.length > 0) {
+      for (const [priority, priorityTrees] of Object.entries(priorityGroups)) {
+        if (priorityTrees.length > 0) {
           content += `### ${this.getPriorityEmoji(Number(priority))} ${this.getPriorityName(Number(priority))}\n\n`;
 
-          for (const task of priorityTasks) {
-            content += this.formatTaskAsMarkdown(task);
+          for (const taskTree of priorityTrees) {
+            content += this.formatTaskTreeAsMarkdown(taskTree);
           }
           content += '\n';
         }
@@ -659,9 +662,72 @@ Ready for new tasks! 🚀
 
   /**
    * Format a task as markdown checkbox with ADHD-friendly styling and mapping metadata
+   * Handles both parent tasks and subtasks with proper indentation
    */
-  private formatTaskAsMarkdown(task: Task): string {
+  private formatTaskAsMarkdown(task: Task, indent: string = ''): string {
     return TaskFormatter.formatTaskAsMarkdown(task, true);
+  }
+
+  /**
+   * Format a task tree (parent + children) with proper hierarchical indentation
+   */
+  private formatTaskTreeAsMarkdown(taskTree: TaskTree, indent: string = ''): string {
+    let result = '';
+
+    // Format the parent task
+    result += this.formatTaskAsMarkdown(taskTree, indent);
+
+    // Format children with increased indentation
+    if (taskTree.children && taskTree.children.length > 0) {
+      const childIndent = indent + '  '; // Add 2 spaces for each level
+
+      for (const child of taskTree.children) {
+        // Format child as subtask with indentation
+        result += `${childIndent}- [ ] ${child.content}`;
+
+        // Add priority indicator for child
+        if (child.priority > 1) {
+          result += ` ${this.getPriorityEmoji(child.priority)}`;
+        }
+
+        // Add due date for child
+        if (child.due) {
+          const dueDate = new Date(child.due.date);
+          const isOverdue = dueDate < new Date();
+          const dateStr = dueDate.toLocaleDateString();
+
+          if (isOverdue) {
+            result += ` 🔴 **OVERDUE: ${dateStr}**`;
+          } else {
+            result += ` 📅 ${dateStr}`;
+          }
+        }
+
+        // Add labels for child
+        if (child.labels.length > 0) {
+          const labelStr = child.labels.map(l => `#${l.name}`).join(' ');
+          result += ` ${labelStr}`;
+        }
+
+        // Add hidden metadata for child
+        result += ` <!-- todoist:${child.id} -->\n`;
+
+        // Add child description with deeper indentation
+        if (child.description && child.description.trim()) {
+          result += TaskFormatter.formatDescription(child.description)
+            .split('\n')
+            .map(line => line ? `${childIndent}  ${line}` : '')
+            .join('\n') + '\n';
+        }
+
+        // Recursively format grandchildren
+        if (child.children && child.children.length > 0) {
+          result += this.formatTaskTreeAsMarkdown(child, childIndent);
+        }
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -688,6 +754,28 @@ Ready for new tasks! 🚀
   }
 
   /**
+   * Sort task trees by priority and due date for ADHD focus
+   */
+  private sortTaskTrees(taskTrees: TaskTree[]): TaskTree[] {
+    return taskTrees.sort((a, b) => {
+      // Sort by priority first (higher priority = lower number, but we want higher priority first)
+      if (a.priority !== b.priority) {
+        return b.priority - a.priority;
+      }
+
+      // Then by due date (overdue and today first)
+      if (a.due && b.due) {
+        return new Date(a.due.date).getTime() - new Date(b.due.date).getTime();
+      }
+      if (a.due && !b.due) return -1;
+      if (!a.due && b.due) return 1;
+
+      // Finally by order
+      return a.order - b.order;
+    });
+  }
+
+  /**
    * Group tasks by priority
    */
   private groupTasksByPriority(tasks: Task[]): Record<number, Task[]> {
@@ -695,6 +783,19 @@ Ready for new tasks! 🚀
 
     for (const task of tasks) {
       groups[task.priority].push(task);
+    }
+
+    return groups;
+  }
+
+  /**
+   * Group task trees by priority
+   */
+  private groupTaskTreesByPriority(taskTrees: TaskTree[]): Record<number, TaskTree[]> {
+    const groups: Record<number, TaskTree[]> = { 4: [], 3: [], 2: [], 1: [] };
+
+    for (const taskTree of taskTrees) {
+      groups[taskTree.priority].push(taskTree);
     }
 
     return groups;
