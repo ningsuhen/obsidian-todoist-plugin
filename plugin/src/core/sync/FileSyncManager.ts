@@ -4,6 +4,8 @@ import type { Task } from '@/data/task';
 import { TaskMappingManager } from './TaskMappingManager';
 import { TaskFormatter, TaskCollectionUtils } from './TaskFormatter';
 import { buildTaskTree, type TaskTree } from '@/data/transformations/relationships';
+import { ConflictResolver, type TaskConflict } from './ConflictResolver';
+import { ConflictResolutionModal } from '@/ui/conflictModal/ConflictResolutionModal';
 import type { Project } from '@/api/domain/project';
 import type { Section } from '@/api/domain/section';
 import type { Label } from '@/api/domain/label';
@@ -28,11 +30,13 @@ export class FileSyncManager {
   private basePath: string;
   private lastSyncTime: Date | null = null;
   private mappingManager: TaskMappingManager;
+  private conflictResolver: ConflictResolver;
 
   constructor(plugin: TodoistPlugin) {
     this.plugin = plugin;
     this.basePath = '📋 01-PRODUCTIVITY/todoist-integration';
     this.mappingManager = new TaskMappingManager(plugin);
+    this.conflictResolver = new ConflictResolver(plugin);
   }
 
   /**
@@ -156,41 +160,70 @@ export class FileSyncManager {
   }
 
   /**
-   * Sync changes from Obsidian back to Todoist
-   * This method detects modifications in markdown files and updates Todoist accordingly
+   * Sync changes from Obsidian back to Todoist with conflict resolution
+   * This method detects modifications in markdown files and resolves conflicts intelligently
    */
-  async syncObsidianChangesToTodoist(): Promise<{ updated: number; completed: number; errors: string[] }> {
-    const result = { updated: 0, completed: 0, errors: [] as string[] };
+  async syncObsidianChangesToTodoist(): Promise<{ updated: number; completed: number; conflicts: number; errors: string[] }> {
+    const result = { updated: 0, completed: 0, conflicts: 0, errors: [] as string[] };
 
     try {
       await this.mappingManager.initialize();
 
-      // Get all markdown files in the integration folder
+      // Get current Todoist tasks for conflict detection
+      const todoistTasks = await this.fetchAllTasks();
+
+      // Get all markdown files and extract Obsidian tasks
       const files = await this.getAllMarkdownFiles();
+      const obsidianTasks: any[] = [];
 
       for (const file of files) {
         try {
           const content = await this.plugin.app.vault.read(file);
-          const modifications = TaskCollectionUtils.findModifiedTasks(content, []);
-
-          for (const mod of modifications) {
-            if (mod.parsed.completed && mod.original) {
-              // Task was completed in Obsidian - close it in Todoist
-              await this.plugin.services.todoist.actions.closeTask(mod.original.id);
-              result.completed++;
-            } else if (mod.parsed.content !== mod.original?.content) {
-              // Task content was modified - update in Todoist
-              // Note: This would require additional API methods for updating tasks
-              console.log(`Task content changed: ${mod.parsed.content}`);
-              result.updated++;
-            }
-          }
+          const fileTasks = this.extractTasksFromMarkdown(content, file.path);
+          obsidianTasks.push(...fileTasks);
         } catch (error) {
-          const errorMsg = `Failed to process file ${file.path}: ${error}`;
+          const errorMsg = `Failed to read file ${file.path}: ${error}`;
           result.errors.push(errorMsg);
           console.error(errorMsg);
         }
       }
+
+      // Detect conflicts between Obsidian and Todoist versions
+      const conflicts = await this.conflictResolver.detectConflicts(
+        obsidianTasks,
+        todoistTasks,
+        this.lastSyncTime || new Date(Date.now() - 24 * 60 * 60 * 1000) // Default to 24h ago
+      );
+
+      if (conflicts.length > 0) {
+        // Resolve conflicts automatically where possible
+        const resolutionResult = await this.conflictResolver.resolveConflicts(conflicts);
+
+        result.conflicts = conflicts.length;
+        result.updated += resolutionResult.resolved;
+        result.errors.push(...resolutionResult.errors);
+
+        // Handle manual conflicts if any
+        if (resolutionResult.manual.length > 0) {
+          await this.showManualConflictResolution(resolutionResult.manual);
+        }
+      } else {
+        // No conflicts - proceed with simple sync
+        for (const obsidianTask of obsidianTasks) {
+          if (obsidianTask.completed && obsidianTask.todoistId) {
+            try {
+              await this.plugin.services.todoist.actions.closeTask(obsidianTask.todoistId);
+              result.completed++;
+            } catch (error) {
+              result.errors.push(`Failed to complete task ${obsidianTask.todoistId}: ${error}`);
+            }
+          }
+        }
+      }
+
+      // Update last sync time
+      this.lastSyncTime = new Date();
+
     } catch (error) {
       const errorMsg = `Failed to sync Obsidian changes: ${error}`;
       result.errors.push(errorMsg);
@@ -198,6 +231,59 @@ export class FileSyncManager {
     }
 
     return result;
+  }
+
+  /**
+   * Extract tasks from markdown content with their metadata
+   */
+  private extractTasksFromMarkdown(content: string, filePath: string): any[] {
+    const lines = content.split('\n');
+    const tasks: any[] = [];
+
+    lines.forEach((line, index) => {
+      const parsed = TaskFormatter.parseTaskLine(line);
+      if (parsed) {
+        tasks.push({
+          ...parsed,
+          filePath,
+          lineNumber: index
+        });
+      }
+    });
+
+    return tasks;
+  }
+
+  /**
+   * Show manual conflict resolution modal for complex conflicts
+   */
+  private async showManualConflictResolution(conflicts: TaskConflict[]): Promise<void> {
+    return new Promise((resolve) => {
+      const modal = new ConflictResolutionModal(
+        this.plugin,
+        conflicts,
+        async (resolutions) => {
+          // Apply manual resolutions
+          for (const [todoistId, resolution] of resolutions) {
+            const conflict = conflicts.find(c => c.todoistId === todoistId);
+            if (conflict) {
+              try {
+                await this.conflictResolver.resolveConflicts([conflict]);
+              } catch (error) {
+                console.error(`Failed to apply manual resolution for ${todoistId}:`, error);
+              }
+            }
+          }
+          resolve();
+        },
+        () => {
+          // User cancelled - skip manual conflicts
+          new Notice('⏭️ Manual conflicts skipped. They will appear again on next sync.', 3000);
+          resolve();
+        }
+      );
+      modal.open();
+    });
   }
 
   /**

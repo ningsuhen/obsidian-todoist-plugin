@@ -48,15 +48,29 @@ const bidirectionalSyncCommand: MakeCommand = (plugin: TodoistPlugin, i18n: Tran
   return {
     name: "Sync Changes Back to Todoist",
     callback: async () => {
-      debug("Starting bidirectional sync");
+      debug("Starting bidirectional sync with conflict resolution");
       try {
         const fileSyncManager = new FileSyncManager(plugin);
         const result = await fileSyncManager.syncObsidianChangesToTodoist();
 
-        if (result.errors.length > 0) {
-          new Notice(`⚠️ Sync completed with ${result.errors.length} errors. Check console for details.`, 5000);
+        // Create ADHD-friendly success message
+        let message = '✅ Bidirectional sync complete! ';
+        const parts = [];
+
+        if (result.completed > 0) parts.push(`${result.completed} tasks completed 🎉`);
+        if (result.updated > 0) parts.push(`${result.updated} tasks updated`);
+        if (result.conflicts > 0) parts.push(`${result.conflicts} conflicts resolved`);
+
+        if (parts.length > 0) {
+          message += parts.join(', ');
         } else {
-          new Notice(`✅ Sync complete! ${result.completed} tasks completed, ${result.updated} tasks updated`, 3000);
+          message += 'Everything is in sync! 🌟';
+        }
+
+        if (result.errors.length > 0) {
+          new Notice(`⚠️ ${message} (${result.errors.length} errors - check console)`, 5000);
+        } else {
+          new Notice(message, 3000);
         }
       } catch (error) {
         console.error("Bidirectional sync failed:", error);
