@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
-import { Notice } from 'obsidian';
 import type TodoistPlugin from '@/index';
+import { Notice } from 'obsidian';
+import { Mock, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock Obsidian modules
 vi.mock('obsidian', () => ({
@@ -9,10 +9,18 @@ vi.mock('obsidian', () => ({
 
 // Mock FileSyncManager
 const mockSyncAllTasks = vi.fn();
+const mockInitializeDirectoryStructure = vi.fn();
+const mockSyncObsidianChangesToTodoist = vi.fn();
+
+// Create a mock class that implements all the methods
+class MockFileSyncManager {
+  syncAllTasks = mockSyncAllTasks;
+  initializeDirectoryStructure = mockInitializeDirectoryStructure;
+  syncObsidianChangesToTodoist = mockSyncObsidianChangesToTodoist;
+}
+
 vi.mock('@/core/sync/FileSyncManager', () => ({
-  FileSyncManager: vi.fn().mockImplementation(() => ({
-    syncAllTasks: mockSyncAllTasks
-  }))
+  FileSyncManager: MockFileSyncManager
 }));
 
 describe('Commands Integration Tests', () => {
@@ -30,6 +38,16 @@ describe('Commands Integration Tests', () => {
       filesUpdated: 8,
       lastSyncTime: new Date(),
       errors: []
+    });
+
+    mockInitializeDirectoryStructure.mockResolvedValue(undefined);
+    mockSyncObsidianChangesToTodoist.mockResolvedValue({
+      completed: 0,
+      updated: 0,
+      conflicts: 0,
+      errors: [],
+      backupCreated: true,
+      backupFile: 'backup-test.json'
     });
 
     // Mock Todoist service
@@ -59,7 +77,7 @@ describe('Commands Integration Tests', () => {
     it('should successfully execute file sync command', async () => {
       // Import commands dynamically to ensure mocks are in place
       const { default: commands } = await import('../index');
-      
+
       // Get the file sync command
       const fileSyncCommand = commands['todoist-file-sync'](
         mockPlugin as TodoistPlugin,
@@ -75,7 +93,7 @@ describe('Commands Integration Tests', () => {
 
     it('should handle successful sync with proper notification', async () => {
       const { default: commands } = await import('../index');
-      
+
       const fileSyncCommand = commands['todoist-file-sync'](
         mockPlugin as TodoistPlugin,
         { sync: 'Sync' } as any
@@ -92,7 +110,7 @@ describe('Commands Integration Tests', () => {
       mockSyncAllTasks.mockRejectedValue(new Error('Network connection failed'));
 
       const { default: commands } = await import('../index');
-      
+
       const fileSyncCommand = commands['todoist-file-sync'](
         mockPlugin as TodoistPlugin,
         { sync: 'Sync' } as any
@@ -102,9 +120,9 @@ describe('Commands Integration Tests', () => {
 
       // Verify error was handled
       expect(mockSyncAllTasks).toHaveBeenCalledOnce();
-      expect(mockPlugin.app!.workspace!.trigger).toHaveBeenCalledWith(
-        'notice',
-        '❌ File sync failed: Network connection failed'
+      expect(Notice).toHaveBeenCalledWith(
+        '❌ File sync failed: Network connection failed',
+        5000
       );
     });
 
@@ -113,7 +131,7 @@ describe('Commands Integration Tests', () => {
       mockSyncAllTasks.mockRejectedValue('Unknown error');
 
       const { default: commands } = await import('../index');
-      
+
       const fileSyncCommand = commands['todoist-file-sync'](
         mockPlugin as TodoistPlugin,
         { sync: 'Sync' } as any
@@ -121,15 +139,15 @@ describe('Commands Integration Tests', () => {
 
       await fileSyncCommand.callback();
 
-      expect(mockPlugin.app!.workspace!.trigger).toHaveBeenCalledWith(
-        'notice',
-        '❌ File sync failed: Unknown error'
+      expect(Notice).toHaveBeenCalledWith(
+        '❌ File sync failed: Unknown error',
+        5000
       );
     });
 
     it('should have correct command name', async () => {
       const { default: commands } = await import('../index');
-      
+
       const fileSyncCommand = commands['todoist-file-sync'](
         mockPlugin as TodoistPlugin,
         { sync: 'Sync' } as any
@@ -142,7 +160,7 @@ describe('Commands Integration Tests', () => {
   describe('Original Sync Command', () => {
     it('should execute original sync command', async () => {
       const { default: commands } = await import('../index');
-      
+
       const syncCommand = commands['todoist-sync'](
         mockPlugin as TodoistPlugin,
         { sync: 'Sync' } as any
@@ -155,7 +173,7 @@ describe('Commands Integration Tests', () => {
 
     it('should use i18n for command name', async () => {
       const { default: commands } = await import('../index');
-      
+
       const syncCommand = commands['todoist-sync'](
         mockPlugin as TodoistPlugin,
         { sync: 'Custom Sync Name' } as any
@@ -168,9 +186,9 @@ describe('Commands Integration Tests', () => {
   describe('Command Registration', () => {
     it('should register all commands including file sync', async () => {
       const { default: commands } = await import('../index');
-      
+
       const commandIds = Object.keys(commands);
-      
+
       expect(commandIds).toContain('todoist-sync');
       expect(commandIds).toContain('todoist-file-sync');
       expect(commandIds).toContain('add-task');
@@ -180,7 +198,7 @@ describe('Commands Integration Tests', () => {
 
     it('should create commands with proper structure', async () => {
       const { default: commands } = await import('../index');
-      
+
       const fileSyncCommand = commands['todoist-file-sync'](
         mockPlugin as TodoistPlugin,
         { sync: 'Sync' } as any
@@ -193,14 +211,12 @@ describe('Commands Integration Tests', () => {
   });
 
   describe('Error Scenarios', () => {
-    it('should handle FileSyncManager import failure', async () => {
-      // Mock dynamic import to fail
-      vi.doMock('@/core/sync/FileSyncManager', () => {
-        throw new Error('Module not found');
-      });
+    it('should handle initialization failure gracefully', async () => {
+      // Mock initializeDirectoryStructure to fail
+      mockInitializeDirectoryStructure.mockRejectedValue(new Error('Directory creation failed'));
 
       const { default: commands } = await import('../index');
-      
+
       const fileSyncCommand = commands['todoist-file-sync'](
         mockPlugin as TodoistPlugin,
         { sync: 'Sync' } as any
@@ -208,10 +224,13 @@ describe('Commands Integration Tests', () => {
 
       await fileSyncCommand.callback();
 
-      expect(mockPlugin.app!.workspace!.trigger).toHaveBeenCalledWith(
-        'notice',
-        expect.stringContaining('❌ File sync failed:')
+      expect(Notice).toHaveBeenCalledWith(
+        expect.stringContaining('❌ File sync failed:'),
+        5000
       );
+
+      // Reset the mock for other tests
+      mockInitializeDirectoryStructure.mockResolvedValue(undefined);
     });
 
     it('should handle service not ready scenario', async () => {
@@ -219,7 +238,7 @@ describe('Commands Integration Tests', () => {
       mockSyncAllTasks.mockRejectedValue(new Error('Todoist service not ready'));
 
       const { default: commands } = await import('../index');
-      
+
       const fileSyncCommand = commands['todoist-file-sync'](
         mockPlugin as TodoistPlugin,
         { sync: 'Sync' } as any
@@ -227,9 +246,9 @@ describe('Commands Integration Tests', () => {
 
       await fileSyncCommand.callback();
 
-      expect(mockPlugin.app!.workspace!.trigger).toHaveBeenCalledWith(
-        'notice',
-        '❌ File sync failed: Todoist service not ready'
+      expect(Notice).toHaveBeenCalledWith(
+        '❌ File sync failed: Todoist service not ready',
+        5000
       );
     });
   });
@@ -237,7 +256,7 @@ describe('Commands Integration Tests', () => {
   describe('Performance', () => {
     it('should complete file sync command quickly', async () => {
       const { default: commands } = await import('../index');
-      
+
       const fileSyncCommand = commands['todoist-file-sync'](
         mockPlugin as TodoistPlugin,
         { sync: 'Sync' } as any
@@ -263,7 +282,7 @@ describe('Commands Integration Tests', () => {
       });
 
       const { default: commands } = await import('../index');
-      
+
       const fileSyncCommand = commands['todoist-file-sync'](
         mockPlugin as TodoistPlugin,
         { sync: 'Sync' } as any
@@ -282,7 +301,7 @@ describe('Commands Integration Tests', () => {
   describe('ADHD-Friendly Features', () => {
     it('should provide immediate feedback on command execution', async () => {
       const { default: commands } = await import('../index');
-      
+
       const fileSyncCommand = commands['todoist-file-sync'](
         mockPlugin as TodoistPlugin,
         { sync: 'Sync' } as any
@@ -290,14 +309,14 @@ describe('Commands Integration Tests', () => {
 
       // Command should start immediately without delays
       const promise = fileSyncCommand.callback();
-      
+
       // Should not hang or require user interaction
       await expect(promise).resolves.toBeUndefined();
     });
 
     it('should have clear, descriptive command name', async () => {
       const { default: commands } = await import('../index');
-      
+
       const fileSyncCommand = commands['todoist-file-sync'](
         mockPlugin as TodoistPlugin,
         { sync: 'Sync' } as any
@@ -313,7 +332,7 @@ describe('Commands Integration Tests', () => {
       mockSyncAllTasks.mockRejectedValue(new Error('Temporary network issue'));
 
       const { default: commands } = await import('../index');
-      
+
       const fileSyncCommand = commands['todoist-file-sync'](
         mockPlugin as TodoistPlugin,
         { sync: 'Sync' } as any
@@ -322,9 +341,9 @@ describe('Commands Integration Tests', () => {
       await fileSyncCommand.callback();
 
       // Error message should be clear but not overwhelming
-      expect(mockPlugin.app!.workspace!.trigger).toHaveBeenCalledWith(
-        'notice',
-        '❌ File sync failed: Temporary network issue'
+      expect(Notice).toHaveBeenCalledWith(
+        '❌ File sync failed: Temporary network issue',
+        5000
       );
     });
   });

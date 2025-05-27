@@ -241,3 +241,6 @@ export const fireCommand = <K extends CommandId>(id: K, plugin: TodoistPlugin) =
   const make = commands[id];
   make(plugin, i18n).callback?.();
 };
+
+// Export commands as default for tests
+export default commands;
