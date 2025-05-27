@@ -399,7 +399,7 @@ export class FileSyncManager {
   // Note: hydrateTask method removed since subscription system returns already hydrated Task objects
 
   /**
-   * Organize tasks into categories for file creation
+   * Organize tasks into categories for file creation with hierarchical project support
    */
   private organizeTasks(tasks: Task[]) {
     const now = new Date();
@@ -425,10 +425,11 @@ export class FileSyncManager {
         }
       }
 
-      // Categorize by project
+      // Categorize by project (hierarchical)
       if (task.project.isInboxProject) {
         organized.inbox.push(task);
       } else {
+        // Use project name as key - the updateProjectFile method will handle hierarchy
         const projectName = task.project.name;
         if (!organized.projects[projectName]) {
           organized.projects[projectName] = [];
@@ -478,11 +479,100 @@ export class FileSyncManager {
 
   /**
    * Update a project file with project tasks organized by sections
+   * Supports hierarchical project structure with dedicated parent project files
    */
   private async updateProjectFile(projectName: string, tasks: Task[]): Promise<void> {
-    const filePath = `${this.basePath}/🗂️ Projects/${this.sanitizeFileName(projectName)}.md`;
+    // Get the project data to check for hierarchy
+    const project = this.getProjectByName(projectName);
+    if (!project) {
+      console.warn(`Project not found: ${projectName}`);
+      return;
+    }
+
+    const filePath = this.getProjectFilePath(project);
     const content = this.generateProjectContent(projectName, tasks);
     await this.updateFile(filePath, content, tasks);
+  }
+
+  /**
+   * Get project file path based on hierarchy
+   */
+  private getProjectFilePath(project: any): string {
+    const sanitizedName = this.sanitizeFileName(project.name);
+
+    if (project.parentId === null) {
+      // Top-level project
+      const hasSubprojects = this.hasSubprojects(project.id);
+
+      if (hasSubprojects) {
+        // Parent project with children - create folder with dedicated file
+        return `${this.basePath}/🗂️ Projects/${sanitizedName}/${sanitizedName}.md`;
+      } else {
+        // Simple project - flat file
+        return `${this.basePath}/🗂️ Projects/${sanitizedName}.md`;
+      }
+    } else {
+      // Subproject - place in parent folder
+      const parentProject = this.getProjectById(project.parentId);
+      if (parentProject) {
+        const parentName = this.sanitizeFileName(parentProject.name);
+        return `${this.basePath}/🗂️ Projects/${parentName}/${sanitizedName}.md`;
+      } else {
+        // Fallback if parent not found
+        return `${this.basePath}/🗂️ Projects/${sanitizedName}.md`;
+      }
+    }
+  }
+
+  /**
+   * Check if a project has subprojects
+   */
+  private hasSubprojects(projectId: string): boolean {
+    const data = this.plugin.services.todoist.data();
+    for (const project of data.projects.iter()) {
+      if (project.parentId === projectId) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Get project by name
+   */
+  private getProjectByName(projectName: string): any | null {
+    const data = this.plugin.services.todoist.data();
+    for (const project of data.projects.iter()) {
+      if (project.name === projectName) {
+        return project;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Get project by ID
+   */
+  private getProjectById(projectId: string): any | null {
+    const data = this.plugin.services.todoist.data();
+    return data.projects.byId(projectId) || null;
+  }
+
+  /**
+   * Get subprojects of a parent project
+   */
+  private getSubprojects(parentProjectId: string): any[] {
+    const data = this.plugin.services.todoist.data();
+    const subprojects: any[] = [];
+
+    for (const project of data.projects.iter()) {
+      if (project.parentId === parentProjectId) {
+        subprojects.push(project);
+      }
+    }
+
+    // Sort by order
+    return subprojects.sort((a, b) => a.order - b.order);
   }
 
   /**
@@ -690,10 +780,11 @@ Your schedule looks clear ahead! 🎯
   }
 
   /**
-   * Generate content for project files
+   * Generate content for project files with hierarchy information
    */
   private generateProjectContent(projectName: string, tasks: Task[]): string {
     const timestamp = new Date().toISOString();
+    const project = this.getProjectByName(projectName);
 
     let content = `# 🗂️ ${projectName}
 
@@ -703,6 +794,26 @@ Your schedule looks clear ahead! 🎯
 <!-- Last sync: ${timestamp} -->
 
 `;
+
+    // Add hierarchy information
+    if (project) {
+      if (project.parentId !== null) {
+        const parentProject = this.getProjectById(project.parentId);
+        if (parentProject) {
+          content += `📁 **Parent Project:** [[${this.sanitizeFileName(parentProject.name)}/${this.sanitizeFileName(parentProject.name)}|${parentProject.name}]]\n\n`;
+        }
+      }
+
+      // Show subprojects if any
+      const subprojects = this.getSubprojects(project.id);
+      if (subprojects.length > 0) {
+        content += `📂 **Subprojects:**\n`;
+        for (const subproject of subprojects) {
+          content += `- [[${this.sanitizeFileName(projectName)}/${this.sanitizeFileName(subproject.name)}|${subproject.name}]]\n`;
+        }
+        content += '\n';
+      }
+    }
 
     if (tasks.length === 0) {
       content += `## Tasks
